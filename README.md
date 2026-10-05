@@ -13,8 +13,10 @@ An Android tablet app for working through a Chinese (Cantonese or Mandarin) stud
   - stroke order shown above each row, plus stroke-order animation, step-by-step strokes and a writing quiz for each character;
   - Cantonese (Jyutping, Cantonese voice) or Mandarin (Pinyin, Mandarin voice);
   - pronunciation: hear each character and the word it belongs to, at normal or slow speed, with tone names (e.g. nei5 · tone 5, low rising);
-  - history of practised words and characters (with quiz results) and bookmarks, each one tap away from a worksheet;
-  - print, or save as PDF (US Letter, 8.5 × 11 in), blank or with your writing;
+  - type English to get Chinese words (Cantonese or Mandarin, following the language switch), from an offline dictionary;
+  - history of practised words and characters (with quiz results) and bookmarks in one list, each one tap away from a fresh
+    worksheet (worksheets themselves aren't stored);
+  - export: print, or share a PDF (US Letter, 8.5 × 11 in) with another app such as Gmail or WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).
 
 ## Building
@@ -93,8 +95,10 @@ This project builds on, bundles data from, or was modelled on the following proj
 | [chanind/hanzi-writer-data](https://github.com/chanind/hanzi-writer-data) | Character stroke data (bundled in `app/src/main/assets/hanzi`) | Arphic Public License ([ARPHICPL.TXT](app/src/main/assets/training/ARPHICPL.TXT)) |
 | [skishore/makemeahanzi](https://github.com/skishore/makemeahanzi) | Original source of the stroke data, derived from fonts by Arphic Technology | Arphic Public License |
 | [12jr/chinese-character-worksheets](https://github.com/12jr/chinese-character-worksheets) | Reference for the worksheet design (row layout, grey tracing characters, stroke-order strips, gridlines, name/title header). No code was copied. | GPL-3.0 |
-| [rime/rime-cantonese](https://github.com/rime/rime-cantonese) | Jyutping readings (bundled in `readings.json`) | CC BY 4.0 |
-| [Unicode Unihan database](https://www.unicode.org/charts/unihan.html) | Pinyin readings (`kMandarin`, bundled in `readings.json`) | Unicode License |
+| [rime/rime-cantonese](https://github.com/rime/rime-cantonese) | Jyutping readings (bundled in `training/readings/`) | CC BY 4.0 |
+| [Unicode Unihan database](https://www.unicode.org/charts/unihan.html) | Pinyin and fallback Jyutping readings; character grade/frequency for ranking dictionary results | Unicode License |
+| [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cedict) | English → Chinese dictionary (bundled in `training/dict/`) | CC BY-SA 4.0 |
+| [CC-Canto](https://cantonese.org) | Cantonese words and Jyutping for the English → Chinese dictionary | CC BY-SA 3.0 |
 | [AndroidX Media3](https://github.com/androidx/media) | Audio playback | Apache 2.0 |
 | [TomRoush/PdfBox-Android](https://github.com/TomRoush/PdfBox-Android) | Reading the characters on PDF pages, so tapping one in Practise mode opens writing practice | Apache 2.0 |
 | [Google ML Kit Text Recognition v2 (Chinese)](https://developers.google.com/ml-kit/vision/text-recognition/v2) | Recognising characters on scanned PDF pages that have no text layer (on-device, bundled model) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |

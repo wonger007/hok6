@@ -26,58 +26,54 @@
   <main class="home-main">
     <form id="newForm" class="card">
       <h2>New worksheet</h2>
-      <label class="field">Title
-        <input id="fTitle" type="text" placeholder="e.g. Lesson 1 vocabulary" maxlength="60">
+      <label class="field">Characters, words or English to practise
+        <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 — or type English: thank you, good morning"></textarea>
+        <small>One page per word (separate words with spaces): stroke order, a row to trace, then rows to write it. English is looked up in the English → Chinese box.</small>
       </label>
-      <label class="field">Characters or words to practise
-        <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 早晨"></textarea>
-        <small>Everything except Chinese characters is ignored. One row per character, 10 rows per page (US Letter).</small>
-      </label>
-      <label class="check"><input id="fDedupe" type="checkbox" checked> Remove repeated characters</label>
-      <label class="field">Grey characters to trace in each row: <b id="fGreyVal">3</b> of 10
-        <input id="fGrey" type="range" min="0" max="10" value="3">
-      </label>
+
+      <fieldset class="field">
+        <legend>Box size</legend>
+        <label class="check"><input type="radio" name="size" value="large" checked> Large — 27 mm, for young children (like the K1 homework)</label>
+        <label class="check"><input type="radio" name="size" value="medium"> Medium — 20 mm</label>
+        <label class="check"><input type="radio" name="size" value="small"> Small — 17 mm</label>
+      </fieldset>
       <fieldset class="field">
         <legend>Square guide lines</legend>
         <label class="check"><input type="radio" name="grid" value="mi" checked> 米 (diagonals)</label>
         <label class="check"><input type="radio" name="grid" value="tian"> 田 (cross)</label>
         <label class="check"><input type="radio" name="grid" value="none"> None</label>
       </fieldset>
-      <label class="check"><input id="fStrokes" type="checkbox" checked> Show stroke order above each row</label>
-      <label class="check"><input id="fRoman" type="checkbox" checked> Show <span class="romanName">Jyutping</span> above each row</label>
+      <label class="check"><input id="fStrokes" type="checkbox" checked> Start with the stroke order</label>
+      <label class="check"><input id="fRoman" type="checkbox" checked> Show <span class="romanName">Jyutping</span> under the word</label>
       <label class="check"><input id="fName" type="checkbox" checked> Write “姓名：” (name) on top</label>
       <button type="submit" class="primary">Create worksheet</button>
       <p id="formError" class="error" hidden></p>
     </form>
 
-    <section class="card">
+    <section class="card" id="translateBox">
       <div class="card-head">
-        <h2>★ Bookmarks</h2>
-        <button id="bmPractise" class="primary small">Practise all</button>
+        <h2>English → <span id="trLang">廣東話 Cantonese</span></h2>
       </div>
-      <ul id="bmList" class="items"></ul>
-      <p id="bmEmpty" class="muted">Tap ☆ on a character or word to bookmark it.</p>
+      <p id="trHint" class="muted">Type English in the practice box (e.g. <i>thank you, good morning</i>) and matching Chinese words appear here. Tap one to use it.</p>
+      <div id="trResults"></div>
     </section>
 
     <section class="card">
       <div class="card-head">
-        <h2>History</h2>
-        <button id="histClear" class="plain small">Clear</button>
+        <h2>History &amp; bookmarks</h2>
+        <button id="bmPractise" class="primary small" hidden>Practise all ★</button>
+        <button id="histClear" class="plain small">Clear history</button>
       </div>
       <div class="filters">
         <button data-filter="all" class="sel">All</button>
         <button data-filter="words">Words</button>
         <button data-filter="chars">Characters</button>
+        <button data-filter="bookmarks">★ Bookmarks</button>
       </div>
       <ul id="histList" class="items"></ul>
-      <p id="histEmpty" class="muted">Words and characters you practise appear here. Tap one to practise it again.</p>
+      <p id="histEmpty" class="muted">Words and characters you practise appear here. Tap one to practise it again; tap ☆ to bookmark it.</p>
     </section>
 
-    <section class="card">
-      <h2>Saved worksheets</h2>
-      <ul id="savedList" class="saved"></ul>
-      <p id="savedEmpty" class="muted">No worksheets yet.</p>
-    </section>
 
     <section class="card credits">
       <h2>About</h2>
@@ -86,7 +82,8 @@
         derived from Arphic fonts, Arphic Public License.
         Worksheet layout modelled on <b>chinese-character-worksheets</b> (github.com/12jr/chinese-character-worksheets).
         Jyutping from <b>rime-cantonese</b> (github.com/rime/rime-cantonese, CC BY 4.0).
-        Pinyin from the Unicode <b>Unihan</b> database.</p>
+        Pinyin from the Unicode <b>Unihan</b> database.
+        English → Chinese from <b>CC-CEDICT</b> (mdbg.net, CC BY-SA 4.0) and <b>CC-Canto</b> (cantonese.org, CC BY-SA 3.0).</p>
       <p class="muted">Characters marked ≈ are not in the stroke data; their stroke order is assembled from their parts and may differ slightly from the standard.</p>
     </section>
   </main>
@@ -117,25 +114,24 @@
       <label><input type="radio" name="lang2" value="yue" checked><span>粵</span></label>
       <label><input type="radio" name="lang2" value="cmn"><span>普</span></label>
     </div>
-    <button class="primary" id="printBtn">Print / PDF</button>
+    <button class="primary" id="printBtn">Export</button>
   </header>
-  <div id="hint" class="hint">Tap the black character at the start of a row to see its stroke order and practise it. Tap the romanization to hear it.</div>
+  <div id="hint" class="hint">Tap a stroke-order square to watch and practise that character. Tap the word at the top to hear it.</div>
+  <!-- One word at a time on screen; Export / Print include every word's page -->
+  <div id="wordBar" class="word-bar">
+    <button class="icon nav" id="wordPrev" aria-label="Previous word">‹</button>
+    <select id="wordSelect" aria-label="Word to practise"></select>
+    <button class="icon nav" id="wordNext" aria-label="Next word">›</button>
+    <button class="icon" id="wordSay" aria-label="Say the word">🔊</button>
+    <button class="icon" id="wordSlow" aria-label="Say the word slowly">🐢</button>
+    <button class="icon star" id="wordStar" aria-label="Bookmark this word">☆</button>
+  </div>
   <div id="pages"></div>
 
   <!-- Phone: one character at a time, big squares to write in -->
   <div id="rowView">
-    <div class="row-head">
-      <button class="icon nav" id="rowPrev" aria-label="Previous character">‹</button>
-      <span id="rowChar" class="row-char"></span>
-      <button id="rowRoman" class="roman-btn"></button>
-      <button class="icon" id="rowSlow" aria-label="Say it slowly">🐢</button>
-      <button class="icon star" id="rowStar" aria-label="Bookmark this character">☆</button>
-      <span id="rowCount" class="muted"></span>
-      <button class="icon nav" id="rowNext" aria-label="Next character">›</button>
-    </div>
-    <div id="rowStrip" class="strip"></div>
     <div id="rowCells" class="row-cells"></div>
-    <p class="muted row-tip">Tap the first square for stroke order and practice. Write in the others.</p>
+    <p class="muted row-tip">Tap a stroke-order square to practise that character. Write in the others.</p>
   </div>
 </section>
 
@@ -179,14 +175,16 @@
   </div>
 </div>
 
-<!-- Print options -->
+<!-- Export: print, or share a PDF with another app (nothing is kept) -->
 <div id="printDialog" class="modal" hidden>
   <div class="modal-card small-card">
-    <h2>Print or save as PDF</h2>
-    <p>Choose “Save as PDF” as the printer in the next screen to get a PDF file.</p>
-    <button class="primary" data-print="blank">Blank worksheet (to write on paper)</button>
-    <button data-print="ink">Worksheet with my writing</button>
-    <button data-print="cancel" class="plain">Cancel</button>
+    <h2>Export worksheet</h2>
+    <label class="check"><input type="radio" name="exportInk" value="blank" checked> Blank (to write on paper)</label>
+    <label class="check"><input type="radio" name="exportInk" value="ink"> With my writing</label>
+    <button class="primary" data-action="share">Share PDF… (Gmail, WhatsApp, …)</button>
+    <button data-action="print">Print</button>
+    <button data-action="cancel" class="plain">Cancel</button>
+    <p id="exportStatus" class="muted" hidden></p>
   </div>
 </div>
 

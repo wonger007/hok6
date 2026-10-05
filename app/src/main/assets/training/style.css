@@ -115,6 +115,16 @@ svg.page .roman, svg.page .head-latin { font-family: "Noto Sans", "Roboto", sans
 svg.page .roman { fill: #333; }
 svg.page .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
+/* English → Chinese suggestions */
+.translate { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: -6px 0 16px; background: rgba(198, 40, 40, 0.04); }
+.translate-head { font-size: 14px; margin-bottom: 6px; }
+.tr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
+.tr-phrase { width: 100%; font-weight: 600; font-size: 14px; }
+.tr-chip { display: flex; flex-direction: column; align-items: flex-start; text-align: left; border-radius: 12px; padding: 6px 12px; min-height: 0; max-width: 220px; }
+.tr-word { font-size: 24px; font-family: "Noto Serif CJK HK", serif; }
+.tr-roman { font-size: 13px; color: var(--brand); }
+.tr-gloss { font-size: 12px; color: var(--muted); max-width: 196px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* History & bookmarks */
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .card-head h2 { margin: 0; }
@@ -134,6 +144,16 @@ button.star { color: #F9A825; font-size: 26px; }
 .word-line { margin: 0; display: flex; align-items: center; gap: 2px; font-size: 18px; color: var(--muted); }
 .word-line span { color: var(--text); font-family: "Noto Serif CJK HK", serif; }
 
+/* Word picker above the worksheet */
+.word-bar { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--card); border-bottom: 1px solid var(--line); }
+.word-bar .nav { font-size: 32px; color: var(--brand); }
+.word-bar select {
+  flex: 1; max-width: 520px; min-height: 48px; font-size: 22px; padding: 4px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text);
+  font-family: "Noto Serif CJK HK", system-ui, sans-serif;
+}
+#pages svg.page:not(.current) { display: none; }
+
 /* Phone: one row at a time */
 #rowView { display: none; flex: 1; overflow: auto; padding: 12px; touch-action: pan-x pan-y; }
 #rowView.finger-draw { touch-action: none; }
@@ -143,7 +163,9 @@ body.row-view .page-only { display: none; }
 .row-head { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .row-head .nav { font-size: 34px; color: var(--brand); }
 .row-char { font-size: 44px; font-family: "Noto Serif CJK HK", serif; }
-.row-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 12px; }
+.row-cells { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.row-group { display: grid; gap: 6px; justify-content: center; }
+.row-group.strokes svg.pcell { outline-color: var(--brand); }
 svg.pcell { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; background: #fff; outline: 1.5px solid #333; }
 svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
 .row-tip { text-align: center; font-size: 14px; }
@@ -186,12 +208,29 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
   max-width: 90vw; text-align: center;
 }
 
+/* Short landscape screens: practice panel side by side (after the panel's normal rules, so it wins) */
+@media (orientation: landscape) and (max-height: 700px) {
+  .practice-card {
+    display: grid; width: min(1000px, 100%);
+    grid-template-columns: auto 1fr; grid-template-rows: auto auto auto auto 1fr; column-gap: 20px; align-items: start;
+  }
+  .practice-head { grid-column: 1 / -1; }
+  .writer-wrap { grid-column: 1; grid-row: 2 / span 4; margin: 0; }
+  .practice-card > .word-line, .practice-card > .status, .practice-card > .practice-buttons, .practice-card > .strip { grid-column: 2; }
+  .practice-buttons, .strip { justify-content: flex-start; }
+  .modal { padding: 6px; }
+  .modal-card { padding: 10px 16px 14px; }
+  .hint { display: none; }
+}
+
 @media print {
   @page { size: letter; margin: 0; }
   html, body { background: #fff; height: auto; }
   #home, .bar, .hint, .modal, .toast { display: none !important; }
   #sheet { display: block !important; height: auto; }
   #pages { overflow: visible; padding: 0; display: block !important; }
+  #pages svg.page { display: block !important; }
+  .word-bar { display: none !important; }
   #rowView { display: none !important; }
   svg.page {
     width: 8.5in !important; height: 11in !important;

@@ -47,4 +47,6 @@
     <string name="practise_mode">Practise mode (tap a character to practise writing it)</string>
     <string name="practise_on_hint">Practise mode: tap a character to practise writing it</string>
     <string name="practise_miss">Tap right on a Chinese character</string>
+    <string name="share_worksheet">Share worksheet</string>
+    <string name="share_failed">Couldn\'t make the PDF</string>
 </resources>

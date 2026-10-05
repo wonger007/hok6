@@ -11,7 +11,9 @@ copies the book in test/ to Download/StudyBookCheck on the device, and then chec
   3. a PDF opens and shows its pages
   4. Practise writing lists the characters on the page and opens writing practice for one
   5. the practice panel shows that character's stroke order (from the bundled stroke data)
-  6. Print / Save as PDF produces a US Letter PDF
+  6. Export → Print / Save as PDF produces a US Letter PDF
+  7. Export → Share PDF opens Android's share menu with a US Letter PDF
+  8. typing English ("thank you") suggests Chinese words
 
 Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
 
@@ -25,6 +27,7 @@ One-time device setup is described in README.md ("Checking on a device").
 """
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -294,13 +297,37 @@ def install(device, build):
         subprocess.run([os.path.join(ROOT, "gradlew"), "assembleDebug", "-q"], cwd=ROOT, check=True)
     abis = device.shell("getprop ro.product.cpu.abilist").strip().split(",")
     folder = os.path.join(ROOT, "app", "build", "outputs", "apk", "debug")
-    for abi in abis:
-        apk = os.path.join(folder, f"app-{abi}-debug.apk")
-        if os.path.exists(apk):
-            print(f"installing {os.path.basename(apk)}…")
-            device.run("install", "-r", apk, timeout=600)
-            return
-    raise Failed(f"no debug APK for this device's CPU ({', '.join(abis)}); build first")
+    apk = next((os.path.join(folder, f"app-{abi}-debug.apk") for abi in abis
+                if os.path.exists(os.path.join(folder, f"app-{abi}-debug.apk"))), None)
+    if not apk:
+        raise Failed(f"no debug APK for this device's CPU ({', '.join(abis)}); build first")
+    with open(apk, "rb") as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    marker = "/data/local/tmp/studybook-check.sha256"
+    installed = device.shell(f"pm path {PACKAGE}", check=False).strip()
+    if installed and device.shell(f"cat {marker}", check=False).strip() == digest:
+        print(f"{os.path.basename(apk)} already installed")
+        return
+
+    def updated():
+        out = device.shell(f"dumpsys package {PACKAGE}", check=False, timeout=60)
+        m = re.search(r"lastUpdateTime=(.+)", out)
+        return m.group(1).strip() if m else ""
+
+    before = updated()
+    print(f"installing {os.path.basename(apk)}…")
+    # Large transfers over USB passed through to WSL occasionally stall; check whether the install landed anyway,
+    # and retry once without streaming.
+    for flags in ([], ["--no-streaming"]):
+        try:
+            device.run("install", "-r", *flags, apk, timeout=300)
+            break
+        except subprocess.TimeoutExpired:
+            if updated() != before:
+                break
+    else:
+        raise Failed("installing the test app did not finish")
+    device.shell(f"echo {digest} > {marker}")
 
 
 def push_book(device, book):
@@ -316,8 +343,19 @@ def push_book(device, book):
     device.shell(f"rm -rf {DEVICE_BOOK}", check=False)
     for rel in files:
         target = f"{DEVICE_BOOK}/{rel}"
+        local = os.path.join(book, rel)
         device.shell(f"mkdir -p \"{os.path.dirname(target)}\"")
-        device.run("push", os.path.join(book, rel), target, timeout=600)
+        for attempt in range(3):
+            try:
+                device.run("push", local, target, timeout=120)
+                break
+            except subprocess.TimeoutExpired:
+                # Over USB passed through to WSL, adb sometimes never reports a finished copy: check the file itself.
+                size = device.shell(f"stat -c %s \"{target}\"", check=False, timeout=30).strip()
+                if size == str(os.path.getsize(local)):
+                    break
+        else:
+            raise Failed(f"could not copy {rel} to the device")
 
 
 def chapter_layout(book):
@@ -458,7 +496,8 @@ def main():
 
     def save_pdf():
         devtools_eval(device, "(()=>{ closePractice(); document.getElementById('printBtn').click();"
-                              " setTimeout(()=>document.querySelector('[data-print=blank]').click(), 300); return 1 })()")
+                              " document.querySelector('input[name=exportInk][value=blank]').checked = true;"
+                              " setTimeout(()=>document.querySelector('[data-action=print]').click(), 300); return 1 })()")
         device.wait_for(r"save as pdf|select a printer|all printers.*", timeout=60)
         if not device.find(r"save as pdf"):
             device.tap(r"select a printer|.*printer.*")
@@ -496,12 +535,50 @@ def main():
             raise Failed(f"page size {size} points, expected US Letter (612, 792)")
         return f"US Letter, {len(data) // 1024} KB"
 
+    def pdf_size(data):
+        box = re.search(rb"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]", data)
+        return (round(float(box.group(1))), round(float(box.group(2)))) if box else None
+
+    def share_pdf():
+        # Back in writing practice after printing; Share PDF makes the file and opens Android's share menu.
+        end = time.time() + 60
+        while "TrainingActivity" not in device.focused():
+            if time.time() > end:
+                raise Failed("writing practice is not showing")
+            device.shell("input keyevent KEYCODE_BACK")
+            time.sleep(2)
+        device.shell(f"run-as {PACKAGE} rm -rf cache/exports", check=False)
+        devtools_eval(device, "(()=>{ document.getElementById('printBtn').click();"
+                              " setTimeout(()=>document.querySelector('[data-action=share]').click(), 300); return 1 })()")
+        device.wait_for(r"share worksheet|.*share.*", timeout=90)
+        files = device.shell(f"run-as {PACKAGE} ls cache/exports", check=False).strip().splitlines()
+        if not files:
+            raise Failed("no PDF was made for sharing")
+        data = device.run("exec-out", "run-as", PACKAGE, "cat", f"cache/exports/{files[0]}", binary=True)
+        device.shell("input keyevent KEYCODE_BACK")
+        if pdf_size(data) != (612, 792):
+            raise Failed(f"page size {pdf_size(data)}, expected US Letter (612, 792)")
+        return f"share menu opened with {files[0]} ({len(data) // 1024} KB, US Letter)"
+
+    def english_lookup():
+        value = devtools_eval(device, "(async()=>{ if(!document.getElementById('sheet').hidden) closeSheet();"
+                                      " const f=document.getElementById('fChars'); f.value='thank you';"
+                                      " f.dispatchEvent(new Event('input')); await new Promise(r=>setTimeout(r,4000));"
+                                      " return [...document.querySelectorAll('#trResults .tr-word')].map(n=>n.textContent) })()", timeout=60)
+        if not value:
+            raise Failed("no Chinese suggestions for “thank you”")
+        if value[0] != "多謝" or "謝謝" not in value:
+            raise Failed(f"unexpected suggestions for “thank you”: {value}")
+        return "“thank you” → " + " ".join(value[:4])
+
     ok = (check("Chapters are listed in order", results, device, chapters_in_order)
           and check("A chapter lists its files", results, device, chapter_lists_files)
           and check("A PDF opens", results, device, pdf_opens)
           and check("Practise writing from the PDF", results, device, practise_from_pdf)
           and check("Stroke order is shown", results, device, stroke_order_shown)
-          and check("Worksheet saves as a PDF", results, device, save_pdf))
+          and check("Worksheet saves as a PDF", results, device, save_pdf)
+          and check("Worksheet shares as a PDF", results, device, share_pdf)
+          and check("English is looked up", results, device, english_lookup))
 
     device.shell(f"am force-stop {PACKAGE}", check=False)
     if started_emulator and not args.keep_emulator:

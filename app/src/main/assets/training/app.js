@@ -7,8 +7,6 @@
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const PAGE_W = 215.9, PAGE_H = 279.4;
-const CELL = 17, CELLS = 11, TOP = 26, ROW_GAP = 24.4, ROWS = 10;
-const LEFT = (PAGE_W - CELLS * CELL) / 2;
 const MODEL = '#111111', GREY = '#C8C8C8', GRID = '#CFCFCF', BRAND = '#C62828';
 const PEN_SIZES = [0.45, 0.8, 1.3];
 /* Set on each stroke rather than in CSS, so strokes also look right in the phone squares (<use> copies). */
@@ -16,6 +14,8 @@ const INK_STYLE = { fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 
 const Native = window.Android || null;
 /* Phones (smallest screen side under 600 dp) get the one-row-at-a-time view; tablets the whole pages. */
 const IS_PHONE = Native && Native.isPhone ? Native.isPhone() : Math.min(screen.width, screen.height) < 600;
+/* Real millimetres to CSS px for this screen (from the app; ~6.3 is a typical Android phone). */
+const PX_PER_MM = (Native && Native.cssPxPerMm && Number(Native.cssPxPerMm())) || 6.3;
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,7 +40,7 @@ const store = {
   },
 };
 
-const DEFAULT_OPTS = { grey: 3, grid: 'mi', strokes: true, roman: true, name: true };
+const DEFAULT_OPTS = { size: 'large', grid: 'mi', strokes: true, roman: true, name: true };
 
 const state = {
   autoStarted: false,
@@ -55,6 +55,7 @@ const state = {
   fingerDraw: store.get('fingerDraw', true),
   zoom: store.get('zoom', 1),
   view: IS_PHONE ? store.get('phoneView', 'row') : 'page',
+  layouts: [],
   row: 0,
 };
 
@@ -165,51 +166,59 @@ function cellGrid(parent, x, y, s, kind) {
   }
 }
 
-/* Small pictures of the character after 1, 2, 3 … strokes; the newest stroke in red. */
-function strokeStrip(parent, data, x, y, maxWidth) {
-  const n = data.strokes.length;
-  const step = Math.min(7.2, maxWidth / n);
-  const size = step * 0.92;
-  for (let k = 0; k < n; k++) {
-    const t = HanziWriter.getScalingTransform(size, size, 0);
-    const outer = el('g', { transform: `translate(${x + k * step} ${y})` }, parent);
-    const g = el('g', { transform: t.transform }, outer);
-    for (let s = 0; s <= k; s++) el('path', { d: data.strokes[s], fill: s === k ? BRAND : '#444' }, g);
-  }
+/* Stroke-order square: the character after `step` strokes, newest stroke in red (step 0: the whole character). */
+function strokeCell(parent, ch, data, step, x, y, size) {
+  if (!data || step === 0) return drawChar(parent, ch, data, x, y, size, MODEL);
+  const t = HanziWriter.getScalingTransform(size, size, size * 0.07);
+  const g = el('g', { transform: t.transform }, el('g', { transform: `translate(${x} ${y})` }, parent));
+  for (let s = 0; s < step; s++) el('path', { d: data.strokes[s], fill: s === step - 1 ? BRAND : '#333' }, g);
 }
 
+/* One page per word (see Core.wordLayout): stroke order, a row to trace, then blank rows to the bottom. */
 function buildPage(ws, pageIndex, totalPages, table) {
+  const word = ws.words[pageIndex];
+  const chars = Array.from(word);
+  const cellMm = Core.BOX_SIZES[ws.opts.size] || Core.BOX_SIZES.large;
+  const layout = Core.wordLayout(chars, chars.map((c) => (state.data[c] ? state.data[c].strokes.length : 0)), ws.opts.strokes, cellMm);
+  state.layouts[pageIndex] = layout;
+  const { cols, left, top, cell } = layout;
+
   const svg = el('svg', { viewBox: `0 0 ${PAGE_W} ${PAGE_H}`, class: 'page' });
   svg.dataset.page = pageIndex;
   // Phone squares show parts of this page through <use href="#pg<n>">.
   const root = el('g', { id: 'pg' + pageIndex }, svg);
   el('rect', { x: 0, y: 0, width: PAGE_W, height: PAGE_H, fill: '#fff' }, root);
 
-  const right = LEFT + CELLS * CELL;
+  const right = left + cols * cell;
   const border = { stroke: '#000', 'stroke-width': 0.3 };
-  line(root, LEFT, 17, right, 17, border);
-  if (ws.opts.name) text(root, LEFT, 15.4, '姓名：', { 'font-size': 4.2 });
-  text(root, PAGE_W / 2, 15.4, ws.title, { 'font-size': 5.2, 'text-anchor': 'middle' });
+  line(root, left, 17, right, 17, border);
+  if (ws.opts.name) text(root, left, 15.4, '姓名：', { 'font-size': 4.2 });
+  text(root, PAGE_W / 2, 15.2, word, { 'font-size': 7, 'text-anchor': 'middle' });
+  if (ws.opts.roman) text(root, PAGE_W / 2, 21.6, romanOfText(word, table), { 'font-size': 3.8, 'text-anchor': 'middle', class: 'roman' });
   text(root, right, 15.4, `${pageIndex + 1}/${totalPages}`, { 'font-size': 3.6, 'text-anchor': 'end', class: 'head-latin' });
+  if (chars.some((c) => state.data[c] && state.data[c].approx)) {
+    text(root, right, 21.6, '≈ stroke order assembled from parts', { 'font-size': 2.6, 'text-anchor': 'end', fill: '#999' });
+  }
 
-  const rows = ws.chars.slice(pageIndex * ROWS, pageIndex * ROWS + ROWS);
-  rows.forEach((ch, r) => {
-    const y = TOP + r * ROW_GAP;
-    const data = state.data[ch];
+  layout.rows.forEach((row, r) => {
+    const y = top + r * cell;
     const g = el('g', {}, root);
-    if (ws.opts.roman) {
-      text(g, LEFT, y - 1.6, readingsOf(ch, table)[0] || '', { 'font-size': 3.8, class: 'roman' });
+    for (let j = 0; j < cols; j++) {
+      const x = left + j * cell;
+      cellGrid(g, x, y, cell, ws.opts.grid);
+      if (row.kind === 'strokes' && j < row.cells.length) {
+        const { ch, step } = row.cells[j];
+        strokeCell(g, ch, state.data[ch], step, x, y, cell);
+      } else if (row.kind === 'model' || row.kind === 'trace') {
+        const ch = chars[j % chars.length];
+        drawChar(g, ch, state.data[ch], x, y, cell, row.kind === 'model' ? MODEL : GREY);
+      }
     }
-    if (ws.opts.strokes && data) strokeStrip(g, data, LEFT + 19, y - 7.1, right - (LEFT + 19));
-    for (let j = 0; j < CELLS; j++) cellGrid(g, LEFT + j * CELL, y, CELL, ws.opts.grid);
-    for (let j = 0; j <= CELLS; j++) line(g, LEFT + j * CELL, y, LEFT + j * CELL, y + CELL, border);
-    line(g, LEFT, y, right, y, border);
-    line(g, LEFT, y + CELL, right, y + CELL, border);
-    for (let j = 0; j <= Math.min(ws.opts.grey, CELLS - 1); j++) {
-      drawChar(g, ch, data, LEFT + j * CELL, y, CELL, j === 0 ? MODEL : GREY);
-    }
-    if (data && data.approx) text(g, LEFT + CELL - 0.6, y + 3, '≈', { 'font-size': 3, 'text-anchor': 'end', fill: '#999' });
+    line(g, left, y, right, y, border);
   });
+  const bottom = top + layout.rows.length * cell;
+  line(root, left, bottom, right, bottom, border);
+  for (let j = 0; j <= cols; j++) line(root, left + j * cell, top, left + j * cell, bottom, border);
 
   el('g', { class: 'ink' }, root);
   return svg;
@@ -217,7 +226,7 @@ function buildPage(ws, pageIndex, totalPages, table) {
 
 async function renderPages() {
   const ws = state.ws;
-  const table = await loadReadings(ws.chars.join(''));
+  const table = await loadReadings(ws.words.join(''));
   const unique = [...new Set(ws.chars)];
   const loaded = await Promise.all(unique.map(loadChar));
   state.data = {};
@@ -226,13 +235,15 @@ async function renderPages() {
   const pages = $('pages');
   const scrollRatio = pages.scrollTop / Math.max(1, pages.scrollHeight);
   pages.innerHTML = '';
-  const total = Math.max(1, Math.ceil(ws.chars.length / ROWS));
+  const total = ws.words.length;
+  state.layouts = [];
   for (let p = 0; p < total; p++) {
     pages.appendChild(buildPage(ws, p, total, table));
     redrawInk(p);
   }
+  fillWordSelect(table);
+  selectWord(state.row);
   pages.scrollTop = scrollRatio * pages.scrollHeight;
-  if (state.view === 'row') renderRow();
 }
 
 // ---------------------------------------------------------------- phone: one row at a time
@@ -240,37 +251,59 @@ async function renderPages() {
 /* Each square is a window onto the printed page (same drawing, same writing), so printing includes what was written here. */
 async function renderRow() {
   const ws = state.ws;
-  const i = Math.max(0, Math.min(state.row, ws.chars.length - 1));
-  state.row = i;
-  const ch = ws.chars[i];
-  const page = Math.floor(i / ROWS);
-  const y = TOP + (i % ROWS) * ROW_GAP;
-  const table = await loadReadings(ch);
-  $('rowChar').textContent = ch;
-  $('rowRoman').textContent = (readingsOf(ch, table)[0] || '') + ' 🔊';
-  $('rowCount').textContent = `${i + 1} / ${ws.chars.length}`;
-  $('rowStar').textContent = isBookmarked(ch) ? '★' : '☆';
-  $('rowPrev').disabled = i === 0;
-  $('rowNext').disabled = i >= ws.chars.length - 1;
+  const page = Math.max(0, Math.min(state.row, ws.words.length - 1));
+  state.row = page;
+  const word = ws.words[page];
+  const len = Array.from(word).length;
+  const layout = state.layouts[page];
 
-  const strip = $('rowStrip');
-  strip.innerHTML = '';
-  const data = state.data[ch];
-  if (data && ws.opts.strokes) {
-    data.strokes.forEach((_, k) => {
-      const svg = el('svg', { viewBox: '0 0 44 44' }, strip);
-      const g = el('g', { transform: HanziWriter.getScalingTransform(44, 44, 3).transform }, svg);
-      for (let s = 0; s <= k; s++) el('path', { d: data.strokes[s], fill: s === k ? BRAND : '#444' }, g);
-    });
-  }
-
+  // Each row shows whole copies of the word, with squares sized to the screen: about four across in portrait,
+  // more in landscape, and never so big that a row doesn't fit on screen.
+  // The printed size on screen (real millimetres), but never wider than the screen allows.
+  const gap = 6, avail = window.innerWidth - 40;
+  const cellPx = Math.min(layout.cell * PX_PER_MM, window.innerHeight * 0.45, avail);
+  const fit = Math.max(1, Math.floor((avail + gap) / (cellPx + gap)));
+  const across = Math.min(layout.cols, Math.max(len, Math.floor(fit / len) * len));
   const cells = $('rowCells');
   cells.innerHTML = '';
-  for (let j = 0; j < CELLS; j++) {
-    const svg = el('svg', { viewBox: `${LEFT + j * CELL} ${y} ${CELL} ${CELL}`, class: 'pcell' + (j === 0 ? ' model' : '') }, cells);
-    svg.dataset.page = page;
-    el('use', { href: '#pg' + page }, svg);
-  }
+  layout.rows.forEach((row, r) => {
+    const count = row.kind === 'strokes' ? row.cells.length : across;
+    const group = document.createElement('div');
+    group.className = 'row-group ' + row.kind;
+    group.style.gridTemplateColumns = `repeat(${across}, ${Math.floor(cellPx)}px)`;
+    for (let j = 0; j < count; j++) {
+      const x = layout.left + j * layout.cell, y = layout.top + r * layout.cell;
+      const svg = el('svg', { viewBox: `${x} ${y} ${layout.cell} ${layout.cell}`, class: 'pcell' }, group);
+      svg.dataset.page = page;
+      el('use', { href: '#pg' + page }, svg);
+    }
+    cells.appendChild(group);
+  });
+}
+
+/* Shows one word's page (tablet) or squares (phone); the others stay in the page for Export / Print. */
+function selectWord(i) {
+  const ws = state.ws;
+  if (!ws) return;
+  state.row = Math.max(0, Math.min(i, ws.words.length - 1));
+  $('wordSelect').value = String(state.row);
+  $('wordPrev').disabled = state.row === 0;
+  $('wordNext').disabled = state.row >= ws.words.length - 1;
+  $('wordStar').textContent = isBookmarked(ws.words[state.row]) ? '★' : '☆';
+  $('pages').querySelectorAll('svg.page').forEach((p) => p.classList.toggle('current', Number(p.dataset.page) === state.row));
+  $('pages').scrollTop = 0;
+  if (state.view === 'row') renderRow();
+}
+
+function fillWordSelect(table) {
+  const select = $('wordSelect');
+  select.innerHTML = '';
+  state.ws.words.forEach((w, i) => {
+    const option = document.createElement('option');
+    option.value = String(i);
+    option.textContent = `${w}   ${romanOfText(w, table)}`;
+    select.appendChild(option);
+  });
 }
 
 function setView(view) {
@@ -283,11 +316,12 @@ function setView(view) {
 }
 
 function setupRowView() {
-  $('rowPrev').onclick = () => { state.row--; renderRow(); };
-  $('rowNext').onclick = () => { state.row++; renderRow(); };
-  $('rowRoman').onclick = () => speak(state.ws.chars[state.row]);
-  $('rowSlow').onclick = () => speak(state.ws.chars[state.row], SLOW);
-  $('rowStar').onclick = () => { $('rowStar').textContent = toggleBookmark(state.ws.chars[state.row]) ? '★' : '☆'; };
+  $('wordPrev').onclick = () => selectWord(state.row - 1);
+  $('wordNext').onclick = () => selectWord(state.row + 1);
+  $('wordSelect').onchange = () => selectWord(Number($('wordSelect').value));
+  $('wordSay').onclick = () => speak(state.ws.words[state.row]);
+  $('wordSlow').onclick = () => speak(state.ws.words[state.row], SLOW);
+  $('wordStar').onclick = () => { $('wordStar').textContent = toggleBookmark(state.ws.words[state.row]) ? '★' : '☆'; };
   $('viewBtn').onclick = () => setView(state.view === 'row' ? 'page' : 'row');
   $('viewBtn').hidden = !IS_PHONE;
   document.body.classList.toggle('phone', IS_PHONE);
@@ -321,15 +355,9 @@ function redrawInk(page) {
   }
 }
 
-let saveTimer = 0;
-function saveInkSoon() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveInk, 600);
-}
-function saveInk() {
-  clearTimeout(saveTimer);
-  if (state.ws) store.set('ink:' + state.ws.id, state.ink);
-}
+/* Worksheets aren't saved (History keeps the words), so writing lasts only while the worksheet is open. */
+function saveInkSoon() {}
+function saveInk() {}
 
 function strokeHits(s, x, y, r) {
   const p = s.p;
@@ -364,16 +392,21 @@ function toPage(svg, e) {
 }
 
 /* Taps on the model character open the practice panel; taps on the romanization speak it. */
+/* Taps on a stroke-order square open that character's practice panel; the word at the top of the page is read aloud. */
 function hitTest(svg, pt) {
   const page = Number(svg.dataset.page);
-  const r = Math.floor((pt.y - (TOP - 7.5)) / ROW_GAP);
-  if (r < 0 || r >= ROWS) return null;
-  const idx = page * ROWS + r;
-  if (idx >= state.ws.chars.length) return null;
-  const y = TOP + r * ROW_GAP;
-  if (pt.x >= LEFT && pt.x <= LEFT + CELL && pt.y >= y && pt.y <= y + CELL) return { type: 'model', idx };
-  if (state.ws.opts.roman && pt.x >= LEFT && pt.x <= LEFT + 18 && pt.y >= y - 7 && pt.y < y) return { type: 'speak', idx };
-  return null;
+  const layout = state.layouts[page];
+  const word = state.ws.words[page];
+  if (!layout) return null;
+  if (pt.y < 23 && pt.y > 8 && Math.abs(pt.x - PAGE_W / 2) < 45) return { type: 'speak', text: word };
+  const r = Math.floor((pt.y - layout.top) / layout.cell);
+  const c = Math.floor((pt.x - layout.left) / layout.cell);
+  const row = layout.rows[r];
+  if (!row || c < 0 || c >= layout.cols) return null;
+  let ch = null;
+  if (row.kind === 'strokes' && c < row.cells.length) ch = row.cells[c].ch;
+  if (row.kind === 'model') ch = Array.from(word)[c % Array.from(word).length];
+  return ch ? { type: 'model', idx: state.ws.chars.indexOf(ch) } : null;
 }
 
 function setFingerDraw(on, announce) {
@@ -482,7 +515,7 @@ function setupInk(pages) {
     if (tap && tap.id === e.pointerId) {
       if (!cancelled) {
         if (tap.hit.type === 'model') openPractice(tap.hit.idx);
-        else speak(state.ws.chars[tap.hit.idx]);
+        else speak(tap.hit.text || state.ws.chars[tap.hit.idx]);
       }
       tap = null;
     }
@@ -658,21 +691,23 @@ async function renderLists() {
   const table = await loadReadings(Object.keys(h).join('') + bookmarks().join(''));
 
   const bm = bookmarks();
-  const bmList = $('bmList');
-  bmList.innerHTML = '';
-  for (const t of bm) bmList.appendChild(listItem(t, table, h[t]));
-  $('bmEmpty').hidden = bm.length > 0;
-  $('bmPractise').disabled = bm.length === 0;
-
   const filter = state.historyFilter || 'all';
-  const entries = Object.values(h)
-    .filter((e) => filter === 'all' || (filter === 'words' ? Array.from(e.text).length > 1 : Array.from(e.text).length === 1))
-    .sort((a, b) => b.last - a.last)
-    .slice(0, 100);
+  // History and bookmarks share one list; the ★ Bookmarks tab shows bookmarks (practised or not), newest first.
+  const items = filter === 'bookmarks'
+    ? bm.map((t) => h[t] || { text: t })
+    : Object.values(h)
+      .filter((e) => filter === 'all' || (filter === 'words' ? Array.from(e.text).length > 1 : Array.from(e.text).length === 1))
+      .sort((a, b) => b.last - a.last)
+      .slice(0, 100);
   const histList = $('histList');
   histList.innerHTML = '';
-  for (const e of entries) histList.appendChild(listItem(e.text, table, e));
-  $('histEmpty').hidden = entries.length > 0;
+  for (const e of items) histList.appendChild(listItem(e.text, table, e.last ? e : null));
+  $('histEmpty').hidden = items.length > 0;
+  $('histEmpty').textContent = filter === 'bookmarks'
+    ? 'No bookmarks yet. Tap ☆ on a character or word to bookmark it.'
+    : 'Words and characters you practise appear here. Tap one to practise it again; tap ☆ to bookmark it.';
+  $('bmPractise').hidden = filter !== 'bookmarks' || bm.length === 0;
+  $('histClear').hidden = filter === 'bookmarks';
   document.querySelectorAll('.filters button').forEach((b) => b.classList.toggle('sel', b.dataset.filter === filter));
 }
 
@@ -699,6 +734,7 @@ function setLang(lang) {
   if (Native && Native.setLanguage) Native.setLanguage(lang);
   if (!$('sheet').hidden && state.ws) renderPages();
   if (!$('practice').hidden) updatePracticeTitle();
+  if (!$('home').hidden) renderTranslations();
 }
 
 // ---------------------------------------------------------------- practice panel (Hanzi Writer)
@@ -755,7 +791,11 @@ async function openPractice(idx) {
   $('pPrev').disabled = pIndex === 0;
   $('pNext').disabled = pIndex >= state.ws.chars.length - 1;
 
-  const size = Math.max(200, Math.min(window.innerWidth - 80, window.innerHeight - 300, 480));
+  // Portrait: writing box above the buttons. Landscape on a short screen: side by side (see style.css).
+  const landscape = window.innerWidth > window.innerHeight && window.innerHeight < 700;
+  const size = landscape
+    ? Math.max(180, Math.min(window.innerHeight - 110, window.innerWidth * 0.5, 480))
+    : Math.max(200, Math.min(window.innerWidth - 80, window.innerHeight - 300, 480));
   drawWriterGrid(size);
   const target = $('writer');
   target.innerHTML = '';
@@ -855,17 +895,70 @@ function setupPractice() {
 // ---------------------------------------------------------------- printing
 
 function setupPrint() {
-  $('printBtn').onclick = () => { $('printDialog').hidden = false; };
-  $('printDialog').addEventListener('click', (e) => {
-    const mode = e.target.dataset && e.target.dataset.print;
-    if (!mode && e.target.id !== 'printDialog') return;
-    $('printDialog').hidden = true;
-    if (!mode || mode === 'cancel') return;
-    saveInk();
-    document.body.classList.toggle('print-blank', mode === 'blank');
-    const name = (state.ws.title || 'worksheet') + (mode === 'blank' ? '' : ' (written)');
-    if (Native && Native.print) Native.print(name);
-    else { window.print(); afterPrint(); }
+  $('printBtn').onclick = () => {
+    $('exportStatus').hidden = true;
+    $('printDialog').hidden = false;
+  };
+  $('printDialog').addEventListener('click', async (e) => {
+    const action = e.target.dataset && e.target.dataset.action;
+    if (!action && e.target.id !== 'printDialog') return;
+    if (!action || action === 'cancel') { $('printDialog').hidden = true; return; }
+    const blank = document.querySelector('input[name=exportInk]:checked').value === 'blank';
+    const name = (state.ws.title || 'worksheet') + (blank ? '' : ' (written)');
+    if (action === 'print') {
+      $('printDialog').hidden = true;
+      document.body.classList.toggle('print-blank', blank);
+      if (Native && Native.print) Native.print(name);
+      else { window.print(); afterPrint(); }
+    } else {
+      await sharePdf(name, blank);
+      $('printDialog').hidden = true;
+    }
+  });
+}
+
+/* Draws each page to an image and hands them to the app, which makes a PDF and opens Android's share menu. */
+async function sharePdf(name, blank) {
+  if (!Native || !Native.shareStart) return toast('Sharing needs the app');
+  const status = $('exportStatus');
+  status.hidden = false;
+  const pages = [...$('pages').querySelectorAll('svg.page')];
+  Native.shareStart(name);
+  for (let i = 0; i < pages.length; i++) {
+    status.textContent = `Preparing page ${i + 1} of ${pages.length}…`;
+    Native.sharePage(await pageImage(pages[i], blank));
+  }
+  status.textContent = 'Opening share…';
+  Native.shareFinish();
+}
+
+/* One page as a PNG (base64), about 190 dpi on US Letter. */
+function pageImage(svg, blank) {
+  const scale = 2;
+  const width = 816 * scale, height = 1056 * scale;
+  const copy = svg.cloneNode(true);
+  copy.setAttribute('width', width);
+  copy.setAttribute('height', height);
+  copy.setAttribute('xmlns', SVGNS);
+  if (blank) copy.querySelectorAll('.ink').forEach((n) => n.remove());
+  const style = document.createElementNS(SVGNS, 'style');
+  style.textContent = 'text{font-family:"Noto Serif CJK HK","Noto Serif CJK TC",serif}.roman,.head-latin{font-family:"Noto Sans",Roboto,sans-serif}.roman{fill:#333}';
+  copy.insertBefore(style, copy.firstChild);
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy));
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/png').split(',')[1]);
+    };
+    img.onerror = reject;
+    img.src = url;
   });
 }
 
@@ -875,99 +968,186 @@ window.afterPrint = function afterPrint() {
 
 // ---------------------------------------------------------------- home: create & list worksheets
 
-function worksheets() {
-  return store.get('worksheets', []);
-}
-
-function renderSaved() {
-  const list = $('savedList');
-  list.innerHTML = '';
-  const all = worksheets();
-  $('savedEmpty').hidden = all.length > 0;
-  for (const ws of all) {
-    const li = document.createElement('li');
-    const open = document.createElement('button');
-    open.className = 'open';
-    open.innerHTML = '<b></b><span></span>';
-    open.querySelector('b').textContent = ws.title;
-    open.querySelector('span').textContent = ws.chars.join('').slice(0, 24) + (ws.chars.length > 24 ? '…' : '');
-    open.onclick = () => openSheet(ws);
-    const del = document.createElement('button');
-    del.className = 'icon';
-    del.textContent = '🗑';
-    del.setAttribute('aria-label', 'Delete ' + ws.title);
-    del.onclick = () => {
-      if (!confirm(`Delete “${ws.title}” and your writing on it?`)) return;
-      store.set('worksheets', worksheets().filter((w) => w.id !== ws.id));
-      store.del('ink:' + ws.id);
-      renderSaved();
-    };
-    li.append(open, del);
-    list.appendChild(li);
+/* Earlier versions saved worksheets and their writing; keep just their words, in History. */
+function migrateSavedWorksheets() {
+  const old = store.get('worksheets', null);
+  if (!old) return;
+  const h = historyAll();
+  for (const ws of old) {
+    for (const w of (ws.words && ws.words.length ? ws.words : ws.chars)) {
+      if (!h[w]) h[w] = { text: w, first: ws.created || Date.now(), last: ws.created || Date.now(), count: 1 };
+    }
+    store.del('ink:' + ws.id);
   }
+  store.set('history', h);
+  store.del('worksheets');
 }
 
 function setupHome() {
-  $('fGrey').oninput = () => { $('fGreyVal').textContent = $('fGrey').value; };
   $('homeBack').onclick = () => { if (Native && Native.close) Native.close(); };
   $('newForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    let chars = Array.from($('fChars').value).filter(isHan);
-    if ($('fDedupe').checked) chars = [...new Set(chars)];
+    const words = Core.practiceWords($('fChars').value);
+    const chars = [...new Set(words.join(''))];
     const err = $('formError');
-    if (!chars.length) {
-      err.textContent = 'Type at least one Chinese character.';
+    if (!words.length) {
+      err.textContent = Core.englishPhrases($('fChars').value).length
+        ? 'Tap a Chinese word below to use it.' : 'Type at least one Chinese character or English word.';
       err.hidden = false;
       return;
     }
     err.hidden = true;
-    const words = [...new Set($('fChars').value.match(/\p{Script=Han}+/gu) || [])];
-    const ws = createWorksheet($('fTitle').value.trim(), chars, words, {
-      grey: Number($('fGrey').value),
+    const ws = createWorksheet('', chars, words, {
+      size: document.querySelector('input[name=size]:checked').value,
       grid: document.querySelector('input[name=grid]:checked').value,
       strokes: $('fStrokes').checked,
       roman: $('fRoman').checked,
       name: $('fName').checked,
     });
     $('fChars').value = '';
-    $('fTitle').value = '';
+    renderTranslations();
     openSheet(ws);
   });
 }
 
-/* Saves a new worksheet; its options become the defaults for worksheets started from the chapter screen. */
+/* A worksheet for the given characters. Nothing is stored except its words (in History) and its options (as defaults). */
 function createWorksheet(title, chars, words, opts) {
-  const ws = {
+  store.set('lastOpts', opts);
+  return {
     id: Date.now().toString(36),
-    title: title || chars.slice(0, 8).join(''),
+    title: title || (words.length ? words.join(' ') : chars.join('')).slice(0, 30),
     chars,
     words,
     opts,
-    created: Date.now(),
   };
-  store.set('worksheets', [ws].concat(worksheets()));
-  store.set('lastOpts', opts);
-  renderSaved();
-  return ws;
 }
 
-/* Practise some text (from a chapter, History or Bookmarks): reuse the worksheet if the same characters were practised before. */
+/* Practise some text (from a chapter, History or Bookmarks) on a fresh worksheet. */
 async function practiseText(title, text, fromChapter) {
-  const chars = [...new Set(Array.from(text).filter(isHan))];
-  if (!chars.length) return;
+  const words = Core.practiceWords(text);
+  const chars = [...new Set(words.join(''))];
+  if (!words.length) return;
   if (fromChapter) state.autoStarted = true;
-  const words = [...new Set(text.match(/\p{Script=Han}+/gu) || [])];
-  const existing = worksheets().find((w) => w.title === title && w.chars.join('') === chars.join(''));
-  const ws = existing || createWorksheet(title, chars, words, Object.assign({}, DEFAULT_OPTS, store.get('lastOpts', {})));
+  const ws = createWorksheet(title, chars, words, Object.assign({}, DEFAULT_OPTS, store.get('lastOpts', {})));
   await openSheet(ws);
   if (chars.length === 1) openPractice(0);
+}
+
+// ---------------------------------------------------------------- English → Chinese
+
+const dictIndex = new Map();
+const dictChunks = new Map();
+let dictMeta = null;
+
+function dictFile(name) {
+  return fetch('dict/' + name + '.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+}
+
+/* The best Chinese words for an English phrase, in the current language. */
+async function searchEnglish(phrase) {
+  const tokens = Core.englishTokens(phrase);
+  if (!tokens.length) return [];
+  if (!dictMeta) dictMeta = (await dictFile('meta')) || { chunk: 1000 };
+  const postings = await Promise.all(tokens.map(async (t) => {
+    if (!dictIndex.has(t[0])) dictIndex.set(t[0], dictFile('i' + t[0]));
+    const table = (await dictIndex.get(t[0])) || {};
+    return table[t] || [];
+  }));
+  // Start from the rarest word; every other word must also be in the entry. Postings are best-first already.
+  postings.sort((a, b) => a.length - b.length);
+  const others = postings.slice(1).map((p) => new Set(p));
+  const candidates = postings[0].filter((i) => others.every((s) => s.has(i))).slice(0, 60);
+  const entries = await Promise.all(candidates.map(async (i) => {
+    const c = Math.floor(i / dictMeta.chunk);
+    if (!dictChunks.has(c)) dictChunks.set(c, dictFile('e' + c));
+    return { order: candidates.indexOf(i), entry: ((await dictChunks.get(c)) || [])[i % dictMeta.chunk] };
+  }));
+  const seen = new Set();
+  // Simplified forms for the Mandarin favourites come from the dictionary entries already loaded, when found.
+  const simp = new Map(entries.filter((x) => x.entry).map((x) => [x.entry[0], x.entry[1]]));
+  const favs = Core.favourites(phrase, state.lang, (w) => simp.get(w) || w);
+  return favs.concat(entries
+    .map((x) => Object.assign(x, { score: x.entry ? Core.matchScore(x.entry, phrase, state.lang) : null }))
+    .filter((x) => x.score !== null)
+    .sort((a, b) => a.score - b.score || a.order - b.order)
+    .map((x) => x.entry))
+    .filter((e) => {
+      const word = state.lang === 'yue' ? e[0] : e[1];
+      if (seen.has(word)) return false;
+      seen.add(word);
+      return true;
+    })
+    .slice(0, 8);
+}
+
+let translateTimer = 0;
+let translateRun = 0;
+
+/* Shows Chinese words for any English typed in the practice box. Tapping one replaces the English with it. */
+function renderTranslations() {
+  clearTimeout(translateTimer);
+  translateTimer = setTimeout(async () => {
+    const run = ++translateRun;
+    const phrases = Core.englishPhrases($('fChars').value);
+    $('trLang').textContent = state.lang === 'yue' ? '廣東話 Cantonese' : '普通話 Mandarin';
+    $('trHint').hidden = phrases.length > 0;
+    if (!phrases.length) { $('trResults').innerHTML = ''; return; }
+    const results = await Promise.all(phrases.map(searchEnglish));
+    if (run !== translateRun) return;
+    const table = await loadReadings(results.flat().map((e) => e[0] + e[1]).join(''));
+    if (state.lang === 'cmn') {
+      // Favourites carry traditional characters; use the dictionary's simplified form when it has one.
+      await Promise.all(results.flat().filter((e) => !e[2]).map(async (e) => {
+        const hit = (await searchEnglish(e[4])).find((x) => x[0] === e[0] && x[2]);
+        if (hit) { e[1] = hit[1]; e[2] = hit[2]; }
+      }));
+    }
+    const out = $('trResults');
+    out.innerHTML = '';
+    phrases.forEach((phrase, i) => {
+      const row = document.createElement('div');
+      row.className = 'tr-row';
+      const label = document.createElement('div');
+      label.className = 'tr-phrase';
+      label.textContent = `“${phrase}”`;
+      row.appendChild(label);
+      if (!results[i].length) {
+        const none = document.createElement('span');
+        none.className = 'muted';
+        none.textContent = 'no match — try another word';
+        row.appendChild(none);
+      }
+      for (const e of results[i]) {
+        const word = state.lang === 'yue' ? e[0] : e[1];
+        const roman = state.lang === 'yue'
+          ? (e[3] || romanOfText(e[0], table))
+          : (e[2] ? Core.pinyinMarks(e[2]) : romanOfText(e[0], table));
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tr-chip';
+        chip.innerHTML = '<span class="tr-word"></span><span class="tr-roman"></span><span class="tr-gloss"></span>';
+        chip.querySelector('.tr-word').textContent = word + (state.lang === 'cmn' && e[0] !== e[1] ? ` (${e[0]})` : '');
+        chip.querySelector('.tr-roman').textContent = roman;
+        chip.querySelector('.tr-gloss').textContent = e[4];
+        chip.onclick = () => {
+          const field = $('fChars');
+          const rx = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'i');
+          field.value = rx.test(field.value) ? field.value.replace(rx, ' ' + word + ' ') : field.value + ' ' + word;
+          field.value = field.value.replace(/\s+/g, ' ').replace(/^ | $/g, '').replace(/ ?[,，] ?/g, ' ');
+          renderTranslations();
+        };
+        row.appendChild(chip);
+      }
+      out.appendChild(row);
+    });
+  }, 300);
 }
 
 // ---------------------------------------------------------------- worksheet view
 
 async function openSheet(ws) {
   state.ws = ws;
-  state.ink = store.get('ink:' + ws.id, {});
+  state.ink = {};
   state.undo = [];
   state.row = 0;
   $('home').hidden = true;
@@ -984,7 +1164,6 @@ function closeSheet() {
   $('pages').innerHTML = '';
   $('sheet').hidden = true;
   $('home').hidden = false;
-  renderSaved();
   renderLists();
 }
 
@@ -1035,6 +1214,16 @@ window.handleBack = function handleBack() {
   return false;
 };
 
+// Rotating the device: re-size the phone squares and the practice panel for the new shape.
+let resizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (state.ws && state.view === 'row' && !$('sheet').hidden) renderRow();
+    if (!$('practice').hidden && state.ws) openPractice(pIndex);
+  }, 250);
+});
+
 window.addEventListener('pagehide', saveInk);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveInk(); });
 
@@ -1051,8 +1240,10 @@ setupPractice();
 setupPrint();
 setupLists();
 renderLists();
+migrateSavedWorksheets();
 setLang(state.lang);
-renderSaved();
+renderLists();
+$('fChars').addEventListener('input', renderTranslations);
 
 // Opened from a chapter: either start a worksheet for the chosen characters straight away, or pre-fill the form.
 if (Native && Native.initialText) {
@@ -1062,6 +1253,5 @@ if (Native && Native.initialText) {
     practiseText(initialTitle, initial, true);
   } else {
     if (initial) $('fChars').value = initial;
-    if (initialTitle) $('fTitle').value = initialTitle;
   }
 }

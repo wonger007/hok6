@@ -21,7 +21,15 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.pdf.PdfDocument
+import android.util.Base64
+import androidx.core.content.FileProvider
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.util.Locale
 
 /**
@@ -40,6 +48,8 @@ class TrainingActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var exportPdf: PdfDocument? = null
+    private var exportName = "worksheet"
     private var pendingSpeech: Triple<String, String, Float>? = null
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -173,11 +183,63 @@ class TrainingActivity : AppCompatActivity() {
         @JavascriptInterface
         fun close() = runOnUiThread { finish() }
 
+        /** Share PDF: the page sends each worksheet page as a PNG, then [shareFinish] opens the share menu. */
+        @JavascriptInterface
+        fun shareStart(name: String) {
+            exportName = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifEmpty { "worksheet" }
+            exportPdf?.close()
+            exportPdf = PdfDocument()
+        }
+
+        @JavascriptInterface
+        fun sharePage(pngBase64: String) {
+            val pdf = exportPdf ?: return
+            val bytes = Base64.decode(pngBase64, Base64.DEFAULT)
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
+            // US Letter in points; the image fills the page.
+            val page = pdf.startPage(PdfDocument.PageInfo.Builder(612, 792, pdf.pages.size + 1).create())
+            page.canvas.drawBitmap(bitmap, null, Rect(0, 0, 612, 792), Paint(Paint.FILTER_BITMAP_FLAG))
+            pdf.finishPage(page)
+            bitmap.recycle()
+        }
+
+        @JavascriptInterface
+        fun shareFinish() {
+            val pdf = exportPdf ?: return
+            exportPdf = null
+            val file = try {
+                // Only the latest export is kept, in the app's cache, for the app it was shared with to read.
+                val dir = File(cacheDir, "exports").apply { deleteRecursively(); mkdirs() }
+                File(dir, "$exportName.pdf").also { out -> out.outputStream().use { pdf.writeTo(it) } }
+            } catch (e: Exception) {
+                null
+            } finally {
+                pdf.close()
+            }
+            runOnUiThread {
+                if (file == null) {
+                    Toast.makeText(this@TrainingActivity, R.string.share_failed, Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                val uri = FileProvider.getUriForFile(this@TrainingActivity, "$packageName.files", file)
+                val send = Intent(Intent.ACTION_SEND)
+                    .setType("application/pdf")
+                    .putExtra(Intent.EXTRA_STREAM, uri)
+                    .putExtra(Intent.EXTRA_SUBJECT, exportName)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                startActivity(Intent.createChooser(send, getString(R.string.share_worksheet)))
+            }
+        }
+
         @JavascriptInterface
         fun initialText(): String = intent.getStringExtra(EXTRA_TEXT).orEmpty()
 
         @JavascriptInterface
         fun initialTitle(): String = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+
+        /** Screen pixels (CSS px) per real millimetre, so on-screen boxes can match their printed size. */
+        @JavascriptInterface
+        fun cssPxPerMm(): Double = resources.displayMetrics.let { it.xdpi / 25.4 / it.density }.toDouble()
 
         @JavascriptInterface
         fun isPhone(): Boolean = resources.configuration.smallestScreenWidthDp < 600
