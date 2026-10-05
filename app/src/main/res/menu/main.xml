@@ -13,6 +13,10 @@
         app:iconTint="?attr/colorOnPrimary"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/new_folder"
+        android:title="@string/new_chapter_folder"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/back_up"
         android:title="@string/back_up"
         app:showAsAction="never" />

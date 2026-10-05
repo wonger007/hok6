@@ -10,6 +10,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -23,7 +24,6 @@ import kotlinx.coroutines.withContext
 const val PREFS = "studybook"
 /** The folder picker starts in Download, where book folders are usually copied. */
 private val DOWNLOADS: Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download")
-private const val KEY_ROOT = "root_uri"
 
 class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences(PREFS, MODE_PRIVATE) }
@@ -33,14 +33,11 @@ class MainActivity : AppCompatActivity() {
     private val adapter = ChapterAdapter { openChapter(it) }
     private var treeUri: Uri? = null
     private val backup = BackupActions(this)
+    private val writeAccess = WriteAccess(this) { treeUri }
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
-        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        contentResolver.persistedUriPermissions
-            .filter { it.uri != uri }
-            .forEach { runCatching { contentResolver.releasePersistableUriPermission(it.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
-        prefs.edit().putString(KEY_ROOT, uri.toString()).apply()
+        BookFolder.keep(this, uri)
         treeUri = uri
         load()
     }
@@ -55,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         list.adapter = adapter
         findViewById<View>(R.id.choose).setOnClickListener { pickFolder.launch(treeUri ?: DOWNLOADS) }
 
-        treeUri = prefs.getString(KEY_ROOT, null)?.let(Uri::parse)?.takeIf { uri ->
+        treeUri = prefs.getString(BookFolder.KEY_ROOT, null)?.let(Uri::parse)?.takeIf { uri ->
             contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
         }
     }
@@ -77,10 +74,16 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(R.id.new_folder).isVisible = treeUri != null
+        return super.onPrepareOptionsMenu(menu)
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.change_folder -> pickFolder.launch(treeUri ?: DOWNLOADS)
             R.id.writing_practice -> startActivity(Intent(this, TrainingActivity::class.java))
+            R.id.new_folder -> newFolder()
             R.id.back_up -> backup.backUp()
             R.id.restore -> backup.restore()
             else -> return super.onOptionsItemSelected(item)
@@ -104,6 +107,7 @@ class MainActivity : AppCompatActivity() {
                     name to chapters
                 }
             }
+            invalidateOptionsMenu()
             result.onSuccess { (name, chapters) ->
                 title = name ?: getString(R.string.app_name)
                 adapter.items = chapters
@@ -113,6 +117,22 @@ class MainActivity : AppCompatActivity() {
                 }
             }.onFailure {
                 showMessage(getString(R.string.folder_unavailable))
+            }
+        }
+    }
+
+    private fun newFolder() = writeAccess.run {
+        val uri = treeUri ?: return@run
+        val rootId = DocumentsContract.getTreeDocumentId(uri)
+        BookFolder.askFolderName(this, adapter.items.filter { it.docId != rootId }.map { it.name }) { name ->
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { BookFolder.createFolder(this@MainActivity, uri, rootId, name) } }
+                result.onSuccess {
+                    Toast.makeText(this@MainActivity, getString(R.string.folder_created, it.name), Toast.LENGTH_SHORT).show()
+                    load()
+                }.onFailure {
+                    Toast.makeText(this@MainActivity, getString(R.string.folder_failed, it.message), Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

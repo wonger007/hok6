@@ -3,11 +3,16 @@
 An Android tablet app for working through a Chinese (Cantonese or Mandarin) study book stored as folders of files.
 
 - **Book folder → chapters.** Pick a folder; each sub-folder is a chapter (sorted so "Chapter 2" comes before "Chapter 10").
+  Files directly in the book folder appear as "Files in book folder".
+- **Organise files.** Long-press a file (or ⋮ → Move files…) to select files and move them to another chapter folder,
+  the book folder, or a new folder; tracing and the last page read move with them. ⋮ → New chapter folder… on the
+  main screen makes an empty chapter.
 - **PDF** pages rendered in the app, with zoom and remembered position.
 - **Word (.docx)** shown as text in the app, keeping headings, bold/italic, tables and ruby (pinyin/jyutping) annotations.
 - **Audio** (mp3, m4a, wav, …) as a chapter playlist with a player bar, speed control, repeat-one and lock-screen controls.
 - **Tracing** on PDFs and Word documents with finger or stylus (pens, eraser, undo, and **Clear** to erase everything
-  on screen at once); saved per page.
+  on screen at once); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
+  the pages (as sharp lines) into the chapter folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
 - **Practise mode (字)** on PDFs and Word documents: tap a character to open writing practice for it; scanned pages are read with on-device text recognition (only one of Trace / Practise is on at a time; the active one is shown solid).
 - **Writing practice** worksheets:
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;

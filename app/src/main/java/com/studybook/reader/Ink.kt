@@ -80,6 +80,9 @@ class InkDocument private constructor(private val file: File) {
         return true
     }
 
+    /** A copy of all the tracing, by page, safe to read on another thread. */
+    fun snapshot(): Map<Int, List<Stroke>> = pages.filterValues { it.isNotEmpty() }.mapValues { it.value.toList() }
+
     fun undo(): Boolean {
         val action = undoStack.removeLastOrNull() ?: return false
         action()
@@ -135,10 +138,27 @@ class InkDocument private constructor(private val file: File) {
         // One thread, so saves of the same file are written in order.
         private val writer = Executors.newSingleThreadExecutor()
 
-        fun load(context: Context, uri: Uri): InkDocument {
+        private fun fileFor(context: Context, uri: Uri): File {
             val digest = MessageDigest.getInstance("SHA-1").digest(uri.toString().toByteArray())
             val name = digest.joinToString("") { "%02x".format(it) }
-            val doc = InkDocument(File(context.filesDir, "ink/$name.json"))
+            return File(context.filesDir, "ink/$name.json")
+        }
+
+        /** Keeps a file's tracing when the file moves to a new address; runs after any save still being written. */
+        fun rename(context: Context, from: Uri, to: Uri) {
+            val source = fileFor(context, from)
+            val target = fileFor(context, to)
+            writer.execute { runCatching { if (source.exists()) source.renameTo(target) } }
+        }
+
+        /** Forgets a file's tracing (it was replaced by another file); runs after any save still being written. */
+        fun delete(context: Context, uri: Uri) {
+            val file = fileFor(context, uri)
+            writer.execute { file.delete() }
+        }
+
+        fun load(context: Context, uri: Uri): InkDocument {
+            val doc = InkDocument(fileFor(context, uri))
             runCatching {
                 if (!doc.file.exists()) return@runCatching
                 val json = JSONObject(doc.file.readText())
