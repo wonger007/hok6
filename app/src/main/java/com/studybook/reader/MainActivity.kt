@@ -17,11 +17,14 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 const val PREFS = "studybook"
+/** Set once Hok6 has asked for permission to keep its backup in a book folder picked by an earlier version. */
+private const val KEY_ASKED_WRITE = "asked_backup_write"
 /** The folder picker starts in Download, where book folders are usually copied. */
 private val DOWNLOADS: Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download")
 
@@ -34,12 +37,14 @@ class MainActivity : AppCompatActivity() {
     private var treeUri: Uri? = null
     private val backup = BackupActions(this)
     private val writeAccess = WriteAccess(this) { treeUri }
+    private var checkingBackup = false
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
         BookFolder.keep(this, uri)
         treeUri = uri
         load()
+        checkBackup()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +65,12 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         load()
+        checkBackup()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AutoBackup.saveLater(this)
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -134,6 +145,41 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, getString(R.string.folder_failed, it.message), Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    /**
+     * Offers to restore the backup in the book folder (e.g. after reinstalling); otherwise makes sure Hok6 may keep
+     * its backup there, asking once if the folder was picked by an earlier version that only read it.
+     */
+    private fun checkBackup() {
+        val uri = treeUri ?: return
+        if (checkingBackup) return
+        checkingBackup = true
+        lifecycleScope.launch {
+            val waiting = withContext(Dispatchers.IO) {
+                runCatching { AutoBackup.waitingToRestore(this@MainActivity, uri) }.getOrNull()
+            }
+            when {
+                waiting != null -> {
+                    MaterialAlertDialogBuilder(this@MainActivity)
+                        .setTitle(R.string.restore_found_title)
+                        .setMessage(getString(R.string.restore_found, AutoBackup.FILE_NAME))
+                        .setCancelable(false)
+                        .setPositiveButton(R.string.restore_found_yes) { _, _ ->
+                            backup.restoreFrom(waiting) { AutoBackup.decided(this@MainActivity, uri) }
+                        }
+                        .setNegativeButton(R.string.restore_found_no) { _, _ -> AutoBackup.decided(this@MainActivity, uri) }
+                        .setOnDismissListener { checkingBackup = false }
+                        .show()
+                    return@launch
+                }
+                !BookFolder.canWrite(this@MainActivity, uri) && !prefs.getBoolean(KEY_ASKED_WRITE, false) -> {
+                    prefs.edit().putBoolean(KEY_ASKED_WRITE, true).apply()
+                    writeAccess.run(R.string.need_write_backup) { AutoBackup.saveLater(this@MainActivity) }
+                }
+            }
+            checkingBackup = false
         }
     }
 

@@ -186,12 +186,12 @@ class WriteAccess(private val activity: AppCompatActivity, private val treeUri: 
         action?.invoke()
     }
 
-    fun run(action: () -> Unit) {
+    fun run(message: Int = R.string.need_write, action: () -> Unit) {
         val uri = treeUri() ?: return
         if (BookFolder.canWrite(activity, uri)) return action()
         pending = action
         MaterialAlertDialogBuilder(activity)
-            .setMessage(R.string.need_write)
+            .setMessage(message)
             .setPositiveButton(R.string.choose_again) { _, _ ->
                 pick.launch(DocumentsContract.buildDocumentUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri)))
             }

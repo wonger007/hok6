@@ -23,11 +23,11 @@ where it's shown here, search for it in the Settings search bar.
 | **Install unknown apps** | Settings → Apps → Special app access → **Install unknown apps** → the browser or Files app you downloaded with → **Allow from this source** | Hok6 isn't on the Play Store, so Android blocks the APK otherwise. If **Play Protect** warns, tap **More details → Install anyway**. You can turn the setting off again afterwards. |
 | **Chinese voices** (text-to-speech) | Settings → System → Languages & input → **Text-to-speech output** → set the engine to **Speech Services by Google** → ⚙ → **Install voice data** → download **Chinese (Hong Kong) / 粵語** for Cantonese and **Chinese (China) / 普通话** for Mandarin | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. Without one, Hok6 shows "No Cantonese voice is installed". |
 | **Internet (once)** | Wi-Fi on the first time you tap **✍ Write by hand** | Downloads the handwriting model for the language; after that it works offline. Everything else works offline. |
-| **Google backup** | Settings → Google → **Backup** → **Backup by Google One** on | Your writing, tracing, history and quiz are saved with the device's backup and come back on a new device. (Also use **Back up my work…**, see step 7.) |
 | **Auto-rotate** (optional) | Quick settings → **Auto-rotate** | Turn the tablet to portrait for a full page, landscape for wider worksheets. |
 | **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. |
 
-No other permissions are needed: Hok6 only asks for access to the book folder you choose (step 3), and audio keeps
+No Google account or Google Drive is needed: Hok6 keeps its backup as a file in your book folder (see step 7).
+No other permissions are needed either: Hok6 only asks for access to the book folder you choose (step 3), and audio keeps
 playing with lock-screen controls without extra settings.
 
 ### 2. Put your book on the device
@@ -89,8 +89,12 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 - **Move files:** in a chapter, long-press a file (or ⋮ → **Move files…**), select files, tap **Move to…** and pick a
   chapter or **＋ New folder**. ⋮ → **New chapter folder…** on the main screen makes a new chapter.
   The first time, Hok6 asks you to choose the book folder again and tap **Allow**, so it may change files.
-- **Back up:** main screen ⋮ → **Back up my work…** saves your writing, tracing, history, bookmarks and quiz to one
-  file. Keep it somewhere safe (e.g. Google Drive); **Restore my work…** brings it back, e.g. after reinstalling.
+- **Backup:** Hok6 keeps a backup of your writing, tracing, history, bookmarks and quiz in your book folder, as
+  `Hok6 backup.json`, and updates it each time you leave a screen after changing something. It stays on the
+  tablet if Hok6 is removed. After reinstalling, choose the same book folder and tap **Restore**.
+  When you copy the book folder to a computer or another device, the backup goes with it.
+- To save a copy somewhere else, main screen ⋮ → **Back up my work…**; **Restore my work…** brings back any backup
+  file you pick.
 
 ## Features
 
@@ -129,10 +133,13 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   - export: print, or share a PDF (US Letter, 8.5 × 11 in, sharp lines and real text) with another app such as Gmail or
     WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).
-- **Your work is backed up**: writing practice history, bookmarks and writing, and tracing are kept in the app's own
-  storage, included in Android's backup and in transfers to a new device. **Back up my work…** / **Restore my work…**
-  (main screen menu, or under History in writing practice) also save it all to one file you keep, e.g. before
-  reinstalling. Restoring adds to what's there: history and bookmarks are combined.
+- **Your work is backed up, on the device**: writing practice history, bookmarks and writing, the quiz and tracing are
+  kept in the app's own storage and copied to `Hok6 backup.json` in the book folder whenever a screen is left after a
+  change (the file is hidden from the chapter's file list). It survives uninstalling; choosing the book folder after
+  reinstalling offers to restore it. Nothing goes to Google Drive (Android's cloud backup is turned off for Hok6),
+  but moving to a new device by cable or Wi-Fi brings it along. **Back up my work…** / **Restore my work…**
+  (main screen menu, or under History in writing practice) save a copy anywhere, or restore any backup file.
+  Restoring adds to what's there: history, bookmarks and the quiz are combined.
 
 ## Building
 

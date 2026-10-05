@@ -139,7 +139,7 @@ class ChapterActivity : AppCompatActivity() {
     private fun loadFiles() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { Docs.listChildren(this@ChapterActivity, treeUri, docId).filter { !it.isDir } }
+                runCatching { Docs.listChildren(this@ChapterActivity, treeUri, docId).filter { !it.isDir && it.name != AutoBackup.FILE_NAME } }
             }
             result.onSuccess {
                 files = it
@@ -156,6 +156,11 @@ class ChapterActivity : AppCompatActivity() {
         super.onPause()
         savePdfPage()
         ink.document?.save()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AutoBackup.saveLater(this)
     }
 
     override fun onDestroy() {

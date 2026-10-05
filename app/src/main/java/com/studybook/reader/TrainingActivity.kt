@@ -105,6 +105,11 @@ class TrainingActivity : AppCompatActivity() {
         web.saveState(outState)
     }
 
+    override fun onStop() {
+        super.onStop()
+        AutoBackup.saveLater(this)
+    }
+
     override fun onDestroy() {
         tts?.shutdown()
         handwriting.close()

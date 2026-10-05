@@ -144,6 +144,9 @@ class InkDocument private constructor(private val file: File) {
             return File(context.filesDir, "ink/$name.json")
         }
 
+        /** Runs [block] on the save thread, after any tracing still being written. */
+        fun afterSaves(block: () -> Unit) = writer.execute(block)
+
         /** Keeps a file's tracing when the file moves to a new address; runs after any save still being written. */
         fun rename(context: Context, from: Uri, to: Uri) {
             val source = fileFor(context, from)

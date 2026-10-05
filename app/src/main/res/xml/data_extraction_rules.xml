@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android backup and transfer to a new device (Android 12+): writing practice data and tracing; not settings such as
-     the book folder, whose access permission doesn't carry over. -->
+<!-- Android 12+: nothing goes to the Google Drive backup (Hok6 keeps its own backup file in the book folder; see
+     AutoBackup). Moving to a new device by cable or Wi-Fi brings writing practice data and tracing; not settings such
+     as the book folder, whose access permission doesn't carry over. -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="file" path="training/" />
-        <include domain="file" path="ink/" />
+        <!-- Only this file, which never exists, so nothing is backed up. -->
+        <include domain="file" path="no-cloud-backup" />
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="training/" />

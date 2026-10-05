@@ -3,6 +3,9 @@ package com.studybook.reader
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -51,5 +54,25 @@ class SavedWorkTest {
         assertEquals("[1,2]", Backup.merge("ink:你|large|s", "[3]", JSONArray("[1,2]")))
         assertEquals("\"cmn\"", Backup.merge("lang", "\"yue\"", "cmn"))
         assertEquals("true", Backup.merge("fingerDraw", null, true))
+    }
+
+    @Test
+    fun backupContentsAreEmptyBeforeAnythingIsDone() {
+        assertTrue(Backup.isEmpty(Backup.contents(folder.newFolder("files"))))
+    }
+
+    @Test
+    fun backupContentsDontDependOnTheOrderThingsWereSaved() {
+        val a = folder.newFolder("a")
+        TrainingStore(java.io.File(a, TrainingStore.DIR)).apply { set("history", "{}"); set("bookmarks", """["你"]""") }
+        val b = folder.newFolder("b")
+        TrainingStore(java.io.File(b, TrainingStore.DIR)).apply { set("bookmarks", """["你"]"""); set("history", "{}") }
+        java.io.File(b, "ink").mkdirs()
+        java.io.File(b, "ink/0a.json").writeText("""{"0":[]}""")
+        assertNotEquals(Backup.contents(a).toString(), Backup.contents(b).toString())
+        java.io.File(a, "ink").mkdirs()
+        java.io.File(a, "ink/0a.json").writeText("""{"0":[]}""")
+        assertEquals(Backup.contents(a).toString(), Backup.contents(b).toString())
+        assertFalse(Backup.isEmpty(Backup.contents(a)))
     }
 }

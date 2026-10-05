@@ -50,7 +50,12 @@
     <string name="share_failed">Couldn\'t make the PDF</string>
     <string name="back_up">Back up my work…</string>
     <string name="restore">Restore my work…</string>
-    <string name="backup_saved">Backup saved. Keep it somewhere safe (e.g. Google Drive) to restore after reinstalling.</string>
+    <string name="backup_saved">Backup saved. Keep a copy off the tablet too (e.g. on a computer) to restore after reinstalling.</string>
+    <string name="restore_found_title">Restore your work?</string>
+    <string name="restore_found">This book folder has a Hok6 backup (%1$s). Restore it to bring back your writing practice, tracing and quiz? It\'s added to anything already in Hok6.\n\nIf you don\'t restore it, it\'s replaced by a backup of your work from now on.</string>
+    <string name="restore_found_yes">Restore</string>
+    <string name="restore_found_no">Don\'t restore</string>
+    <string name="need_write_backup">Hok6 now keeps a backup of your work in your book folder (Hok6 backup.json), so it\'s safe if Hok6 is removed.\n\nTap Choose folder, pick the same book folder again, then tap Allow.</string>
     <string name="backup_failed">Couldn\'t save the backup</string>
     <string name="backup_restored">Restored: %1$d words in history, tracing on %2$d files</string>
     <string name="backup_not_valid">That file isn\'t a Hok6 backup</string>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 9 to 11: nothing goes to the Google Drive backup (Hok6 keeps its own backup file in the book folder; see
+     AutoBackup). Moving to a new device by cable or Wi-Fi brings writing practice data and tracing; not settings such
+     as the book folder. -->
+<full-backup-content>
+    <include domain="file" path="training/" requireFlags="deviceToDeviceTransfer" />
+    <include domain="file" path="ink/" requireFlags="deviceToDeviceTransfer" />
+</full-backup-content>
