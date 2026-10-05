@@ -4,6 +4,96 @@
 
 Hok6 (學, *hok6* in Jyutping: to learn, to study, to imitate) is an Android tablet app for working through a Chinese (Cantonese or Mandarin) study book stored as folders of files.
 
+## How to use
+
+### 1. Install
+
+1. On the Android tablet or phone, open the [latest release](https://github.com/wonger007/hok6/releases/latest) and
+   download `Hok6-<version>-arm64-v8a.apk` (use `armeabi-v7a` only on an old 32-bit device).
+2. Open the downloaded file and allow installing from that source when Android asks. Android 8.0 or newer is needed.
+   A new version installs over the old one and keeps your work.
+
+### Device settings
+
+Set these once on the tablet or phone. Menu names differ a little between makers (Samsung, Pixel, …); if one isn't
+where it's shown here, search for it in the Settings search bar.
+
+| Setting | Where | Why |
+| --- | --- | --- |
+| **Install unknown apps** | Settings → Apps → Special app access → **Install unknown apps** → the browser or Files app you downloaded with → **Allow from this source** | Hok6 isn't on the Play Store, so Android blocks the APK otherwise. If **Play Protect** warns, tap **More details → Install anyway**. You can turn the setting off again afterwards. |
+| **Chinese voices** (text-to-speech) | Settings → System → Languages & input → **Text-to-speech output** → set the engine to **Speech Services by Google** → ⚙ → **Install voice data** → download **Chinese (Hong Kong) / 粵語** for Cantonese and **Chinese (China) / 普通话** for Mandarin | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. Without one, Hok6 shows "No Cantonese voice is installed". |
+| **Internet (once)** | Wi-Fi on the first time you tap **✍ Write by hand** | Downloads the handwriting model for the language; after that it works offline. Everything else works offline. |
+| **Google backup** | Settings → Google → **Backup** → **Backup by Google One** on | Your writing, tracing, history and quiz are saved with the device's backup and come back on a new device. (Also use **Back up my work…**, see step 7.) |
+| **Auto-rotate** (optional) | Quick settings → **Auto-rotate** | Turn the tablet to portrait for a full page, landscape for wider worksheets. |
+| **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. |
+
+No other permissions are needed: Hok6 only asks for access to the book folder you choose (step 3), and audio keeps
+playing with lock-screen controls without extra settings.
+
+### 2. Put your book on the device
+
+Copy your book to the device (e.g. into **Download**) as one folder, with a sub-folder for each chapter:
+
+```
+My Book/
+├── Chapter 1/
+│   ├── Homework.pdf
+│   ├── Vocabulary.docx
+│   └── Lesson 1.mp3
+├── Chapter 2/
+│   └── …
+└── Notes.pdf          ← files here show as "Files in book folder"
+```
+
+PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; other files open in another app.
+
+### 3. Open your book
+
+1. Open **Hok6** and tap **Choose book folder**. Pick your book folder, tap **Use this folder**, then **Allow**.
+   Hok6 remembers it; **Change book folder** (folder icon) picks another one.
+2. Tap a chapter to see its files, then tap a file to open it full screen. **Back** returns to the file list.
+3. Tap an audio file to play the chapter's recordings, with speed and repeat controls.
+
+### 4. Do the homework on the page
+
+- **Write** straight on a PDF or Word page with a finger or stylus. Scroll and zoom with two fingers (once you use a
+  stylus, fingers only scroll).
+- Use the title bar to change the pen colour and size, erase, **Undo**, **Clear** the screen, or zoom.
+- Your writing is saved automatically for each page.
+- When it's finished, ⋮ → **Save a copy with my tracing…** saves a new PDF with your writing on it, named e.g.
+  `completed_Homework.pdf`, in the same chapter folder (the original isn't changed).
+
+### 5. Practice writing characters
+
+- On a page, tap **Practice**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
+  worksheet with stroke order, a row to trace and rows to write in. Tap a pen to go back to writing on the page.
+- Or tap **Writing practice** on the main screen and type characters, words or English (e.g. *thank you*), or tap
+  **✍ Write by hand** to write a character with a stylus. Then tap **Create worksheet**.
+- On a worksheet, tap a stroke-order square to watch the strokes and try **✍ Write it**; tap 🔊 to hear the word.
+  **Export** prints it or shares it as a PDF.
+- Switch between **廣東話 Cantonese** and **普通話 Mandarin** at the top.
+
+### 6. Quiz yourself
+
+1. On a page, tap **Practice**, tap a character, choose the ones to learn and tap **Add to quiz**.
+2. Open **Writing practice** and find the **Quiz** card:
+   - **Flash cards**: choose Chinese → meaning, English → Chinese or Sound → Chinese, tap **Start flash cards**, then
+     **Show answer** and mark **Knew it** or **Again**.
+   - **Written quiz**: choose the prompt (English meaning, the Chinese character, which can hide after a few seconds,
+     or the pronunciation), tap **Start written quiz** and write each character in the box. **Show me** shows how
+     it's written.
+3. Missed ones come back at the end of the round, and you can quiz the missed ones again.
+
+### 7. Keep your files tidy and your work safe
+
+- **Move files:** in a chapter, long-press a file (or ⋮ → **Move files…**), select files, tap **Move to…** and pick a
+  chapter or **＋ New folder**. ⋮ → **New chapter folder…** on the main screen makes a new chapter.
+  The first time, Hok6 asks you to choose the book folder again and tap **Allow**, so it may change files.
+- **Back up:** main screen ⋮ → **Back up my work…** saves your writing, tracing, history, bookmarks and quiz to one
+  file. Keep it somewhere safe (e.g. Google Drive); **Restore my work…** brings it back, e.g. after reinstalling.
+
+## Features
+
 - **Book folder → chapters.** Pick a folder; each sub-folder is a chapter (sorted so "Chapter 2" comes before "Chapter 10").
   Files directly in the book folder appear as "Files in book folder". A chapter opens as a full-screen file list; a
   file opens full screen, and Back returns to the list.
