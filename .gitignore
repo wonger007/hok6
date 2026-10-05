@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+
+# Local test book folder (sample chapters/files pushed to the emulator or tablet)
+test/
+tools/.cache/

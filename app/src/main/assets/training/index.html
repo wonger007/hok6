@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Writing practice</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="hanzi-writer.min.js"></script>
+  <script src="core.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+
+<!-- Home: create a worksheet and open saved ones -->
+<section id="home" class="view">
+  <header class="bar">
+    <button class="icon" id="homeBack" aria-label="Back">←</button>
+    <h1>Writing practice</h1>
+    <div class="spacer"></div>
+    <div class="lang" role="radiogroup" aria-label="Language">
+      <label><input type="radio" name="lang" value="yue" checked><span>廣東話 Cantonese</span></label>
+      <label><input type="radio" name="lang" value="cmn"><span>普通話 Mandarin</span></label>
+    </div>
+  </header>
+
+  <main class="home-main">
+    <form id="newForm" class="card">
+      <h2>New worksheet</h2>
+      <label class="field">Title
+        <input id="fTitle" type="text" placeholder="e.g. Lesson 1 vocabulary" maxlength="60">
+      </label>
+      <label class="field">Characters or words to practise
+        <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 早晨"></textarea>
+        <small>Everything except Chinese characters is ignored. One row per character, 10 rows per page (US Letter).</small>
+      </label>
+      <label class="check"><input id="fDedupe" type="checkbox" checked> Remove repeated characters</label>
+      <label class="field">Grey characters to trace in each row: <b id="fGreyVal">3</b> of 10
+        <input id="fGrey" type="range" min="0" max="10" value="3">
+      </label>
+      <fieldset class="field">
+        <legend>Square guide lines</legend>
+        <label class="check"><input type="radio" name="grid" value="mi" checked> 米 (diagonals)</label>
+        <label class="check"><input type="radio" name="grid" value="tian"> 田 (cross)</label>
+        <label class="check"><input type="radio" name="grid" value="none"> None</label>
+      </fieldset>
+      <label class="check"><input id="fStrokes" type="checkbox" checked> Show stroke order above each row</label>
+      <label class="check"><input id="fRoman" type="checkbox" checked> Show <span class="romanName">Jyutping</span> above each row</label>
+      <label class="check"><input id="fName" type="checkbox" checked> Write “姓名：” (name) on top</label>
+      <button type="submit" class="primary">Create worksheet</button>
+      <p id="formError" class="error" hidden></p>
+    </form>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>★ Bookmarks</h2>
+        <button id="bmPractise" class="primary small">Practise all</button>
+      </div>
+      <ul id="bmList" class="items"></ul>
+      <p id="bmEmpty" class="muted">Tap ☆ on a character or word to bookmark it.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>History</h2>
+        <button id="histClear" class="plain small">Clear</button>
+      </div>
+      <div class="filters">
+        <button data-filter="all" class="sel">All</button>
+        <button data-filter="words">Words</button>
+        <button data-filter="chars">Characters</button>
+      </div>
+      <ul id="histList" class="items"></ul>
+      <p id="histEmpty" class="muted">Words and characters you practise appear here. Tap one to practise it again.</p>
+    </section>
+
+    <section class="card">
+      <h2>Saved worksheets</h2>
+      <ul id="savedList" class="saved"></ul>
+      <p id="savedEmpty" class="muted">No worksheets yet.</p>
+    </section>
+
+    <section class="card credits">
+      <h2>About</h2>
+      <p>Stroke order animations and quizzes by <b>Hanzi Writer</b> (github.com/chanind/hanzi-writer, MIT).
+        Character data from <b>hanzi-writer-data</b> / <b>Make Me a Hanzi</b> (github.com/skishore/makemeahanzi),
+        derived from Arphic fonts, Arphic Public License.
+        Worksheet layout modelled on <b>chinese-character-worksheets</b> (github.com/12jr/chinese-character-worksheets).
+        Jyutping from <b>rime-cantonese</b> (github.com/rime/rime-cantonese, CC BY 4.0).
+        Pinyin from the Unicode <b>Unihan</b> database.</p>
+      <p class="muted">Characters marked ≈ are not in the stroke data; their stroke order is assembled from their parts and may differ slightly from the standard.</p>
+    </section>
+  </main>
+</section>
+
+<!-- Worksheet: pages you write on -->
+<section id="sheet" class="view" hidden>
+  <header class="bar tools">
+    <button class="icon" id="sheetBack" aria-label="Back">←</button>
+    <h1 id="sheetTitle"></h1>
+    <div class="spacer"></div>
+    <div class="group">
+      <button class="pen sel" data-color="#212121" aria-label="Black pen"><i style="background:#212121"></i></button>
+      <button class="pen" data-color="#1E88E5" aria-label="Blue pen"><i style="background:#1E88E5"></i></button>
+      <button class="pen" data-color="#E53935" aria-label="Red pen"><i style="background:#E53935"></i></button>
+      <button class="icon" id="sizeBtn" aria-label="Pen size">◍</button>
+      <button class="icon" id="eraserBtn" aria-label="Eraser">⌫</button>
+      <button class="icon" id="undoBtn" aria-label="Undo">↶</button>
+      <button class="icon" id="clearBtn" aria-label="Clear writing">🗑</button>
+    </div>
+    <div class="group">
+      <button class="icon" id="viewBtn" aria-label="Show whole pages">📄</button>
+      <button class="icon" id="fingerBtn" aria-label="Finger draws">☝</button>
+      <button class="icon page-only" id="zoomOut" aria-label="Zoom out">－</button>
+      <button class="icon page-only" id="zoomIn" aria-label="Zoom in">＋</button>
+    </div>
+    <div class="lang small" role="radiogroup" aria-label="Language">
+      <label><input type="radio" name="lang2" value="yue" checked><span>粵</span></label>
+      <label><input type="radio" name="lang2" value="cmn"><span>普</span></label>
+    </div>
+    <button class="primary" id="printBtn">Print / PDF</button>
+  </header>
+  <div id="hint" class="hint">Tap the black character at the start of a row to see its stroke order and practise it. Tap the romanization to hear it.</div>
+  <div id="pages"></div>
+
+  <!-- Phone: one character at a time, big squares to write in -->
+  <div id="rowView">
+    <div class="row-head">
+      <button class="icon nav" id="rowPrev" aria-label="Previous character">‹</button>
+      <span id="rowChar" class="row-char"></span>
+      <button id="rowRoman" class="roman-btn"></button>
+      <button class="icon" id="rowSlow" aria-label="Say it slowly">🐢</button>
+      <button class="icon star" id="rowStar" aria-label="Bookmark this character">☆</button>
+      <span id="rowCount" class="muted"></span>
+      <button class="icon nav" id="rowNext" aria-label="Next character">›</button>
+    </div>
+    <div id="rowStrip" class="strip"></div>
+    <div id="rowCells" class="row-cells"></div>
+    <p class="muted row-tip">Tap the first square for stroke order and practice. Write in the others.</p>
+  </div>
+</section>
+
+<!-- Hanzi Writer practice for one character -->
+<div id="practice" class="modal" hidden>
+  <div class="modal-card practice-card">
+    <div class="practice-head">
+      <button class="icon" id="pPrev" aria-label="Previous character">‹</button>
+      <div class="practice-title">
+        <span id="pChar" class="pchar"></span>
+        <div class="pron">
+          <div class="pron-row">
+            <button id="pRoman" class="roman-btn"></button>
+            <button class="icon" id="pSlow" aria-label="Say it slowly">🐢</button>
+            <button class="icon star" id="pStar" aria-label="Bookmark this character">☆</button>
+          </div>
+          <span id="pTone" class="tone"></span>
+        </div>
+      </div>
+      <button class="icon" id="pNext" aria-label="Next character">›</button>
+      <div class="spacer"></div>
+      <button class="icon" id="pClose" aria-label="Close">✕</button>
+    </div>
+    <div class="writer-wrap">
+      <svg id="pGrid" class="writer-grid" viewBox="0 0 100 100" aria-hidden="true"></svg>
+      <div id="writer"></div>
+    </div>
+    <p id="pWord" class="word-line" hidden>
+      in <span id="pWordText"></span>
+      <button class="icon" id="pWordSay" aria-label="Say the word">🔊</button>
+      <button class="icon" id="pWordSlow" aria-label="Say the word slowly">🐢</button>
+    </p>
+    <p id="pStatus" class="status"></p>
+    <div class="practice-buttons">
+      <button id="pAnimate" class="primary">▶ Stroke order</button>
+      <button id="pStep">Next stroke</button>
+      <button id="pQuiz">✍ Write it</button>
+      <button id="pOutline">Outline</button>
+    </div>
+    <div id="pStrip" class="strip"></div>
+  </div>
+</div>
+
+<!-- Print options -->
+<div id="printDialog" class="modal" hidden>
+  <div class="modal-card small-card">
+    <h2>Print or save as PDF</h2>
+    <p>Choose “Save as PDF” as the printer in the next screen to get a PDF file.</p>
+    <button class="primary" data-print="blank">Blank worksheet (to write on paper)</button>
+    <button data-print="ink">Worksheet with my writing</button>
+    <button data-print="cancel" class="plain">Cancel</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+</body>
+</html>

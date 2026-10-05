@@ -1,0 +1,521 @@
+#!/usr/bin/env python3
+"""
+End-to-end check on a real Android device, with no taps needed from you. When no device is connected and ready,
+it starts an emulator instead (and shuts it down afterwards).
+
+It installs "Study Book (test)" (the debug build, a separate app from your own "Study Book", with its own data),
+copies the book in test/ to Download/StudyBookCheck on the device, and then checks:
+
+  1. the chapters are listed in natural order (Chapter_2 before Chapter_10)
+  2. a chapter lists all its files
+  3. a PDF opens and shows its pages
+  4. Practise writing lists the characters on the page and opens writing practice for one
+  5. the practice panel shows that character's stroke order (from the bundled stroke data)
+  6. Print / Save as PDF produces a US Letter PDF
+
+Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
+
+Usage:
+  python3 tools/device_check.py                 # build, install and check on the connected device
+  python3 tools/device_check.py --no-build      # use the APK already built
+  python3 tools/device_check.py --serial ID     # pick a device when several are connected
+  python3 tools/device_check.py --connect IP:PORT   # use a device paired for wireless debugging
+
+One-time device setup is described in README.md ("Checking on a device").
+"""
+import argparse
+import base64
+import json
+import os
+import re
+import socket
+import struct
+import subprocess
+import sys
+import time
+import urllib.request
+import xml.etree.ElementTree as ET
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, "build", "device-check")
+PACKAGE = "com.studybook.reader.debug"
+MAIN = PACKAGE + "/com.studybook.reader.MainActivity"
+DEVICE_BOOK = "/sdcard/Download/StudyBookCheck"
+DEVTOOLS_PORT = 9333
+
+
+def natural_key(name):
+    return [(0, int(p), "") if p.isdigit() else (1, 0, p.lower()) for p in re.split(r"(\d+)", name) if p]
+
+
+class Failed(Exception):
+    pass
+
+
+class Device:
+    def __init__(self, adb, serial):
+        self.adb = [adb] + (["-s", serial] if serial else [])
+        self.step = 0
+
+    def run(self, *args, check=True, timeout=120, binary=False):
+        result = subprocess.run(self.adb + list(args), capture_output=True, timeout=timeout)
+        if check and result.returncode != 0:
+            raise Failed(f"adb {' '.join(args)}: {result.stderr.decode(errors='replace').strip()}")
+        return result.stdout if binary else result.stdout.decode(errors="replace")
+
+    def shell(self, command, **kw):
+        return self.run("shell", command, **kw)
+
+    # ---- screen
+
+    def screenshot(self, name):
+        self.step += 1
+        path = os.path.join(OUT, f"{self.step:02d}-{name}.png")
+        with open(path, "wb") as f:
+            f.write(self.run("exec-out", "screencap", "-p", binary=True))
+        return path
+
+    def nodes(self):
+        """The views on screen: (text, description, centre x, centre y, enabled)."""
+        for _ in range(5):
+            self.shell("uiautomator dump /sdcard/sbcheck-ui.xml", check=False, timeout=60)
+            xml = self.shell("cat /sdcard/sbcheck-ui.xml", check=False)
+            if xml.strip().startswith("<?xml"):
+                break
+            time.sleep(1)
+        else:
+            return []
+        out = []
+        for n in ET.fromstring(xml).iter("node"):
+            x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds", "[0,0][0,0]")))
+            out.append((n.get("text", ""), n.get("content-desc", ""), (x1 + x2) // 2, (y1 + y2) // 2, n.get("enabled") == "true"))
+        return out
+
+    def find(self, pattern, nodes=None):
+        rx = re.compile(pattern, re.I)
+        for node in nodes if nodes is not None else self.nodes():
+            if rx.fullmatch(node[0]) or rx.fullmatch(node[1]):
+                return node
+        return None
+
+    def wait_for(self, pattern, timeout=40):
+        end = time.time() + timeout
+        while time.time() < end:
+            nodes = self.nodes()
+            self.dismiss_not_responding(nodes)
+            node = self.find(pattern, nodes)
+            if node:
+                return node
+            time.sleep(1)
+        raise Failed(f"nothing matching {pattern!r} appeared on screen")
+
+    def tap(self, pattern, timeout=40):
+        node = self.wait_for(pattern, timeout)
+        self.shell(f"input tap {node[2]} {node[3]}")
+        return node
+
+    def dismiss_not_responding(self, nodes):
+        # Slow devices and emulators sometimes show "isn't responding"; waiting is always the right answer here.
+        if self.find(r".*isn.t responding", nodes):
+            wait = self.find(r"wait", nodes)
+            if wait:
+                self.shell(f"input tap {wait[2]} {wait[3]}")
+
+    def focused(self):
+        out = self.shell("dumpsys window")
+        m = re.findall(r"mCurrentFocus=Window\{[^ ]+ u0 ([^}]+)\}", out)
+        return m[-1] if m else ""
+
+
+# ---- Chrome DevTools, to look inside writing practice (a web page in the app)
+
+def devtools_eval(device, expression, timeout=30):
+    pid = device.shell(f"pidof {PACKAGE}").strip().split()[0]
+    device.run("forward", f"tcp:{DEVTOOLS_PORT}", f"localabstract:webview_devtools_remote_{pid}")
+    pages = json.load(urllib.request.urlopen(f"http://127.0.0.1:{DEVTOOLS_PORT}/json", timeout=10))
+    page = next(p for p in pages if p.get("type") == "page")
+    url = page["webSocketDebuggerUrl"]
+    host, port_path = url[len("ws://"):].split(":", 1)
+    port, path = port_path.split("/", 1)
+    with socket.create_connection(("127.0.0.1", int(port)), timeout=timeout) as s:
+        key = base64.b64encode(os.urandom(16)).decode()
+        s.sendall((f"GET /{path} HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                   f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+        head = b""
+        while b"\r\n\r\n" not in head:
+            head += s.recv(1)
+        message = json.dumps({"id": 1, "method": "Runtime.evaluate",
+                              "params": {"expression": expression, "awaitPromise": True, "returnByValue": True}}).encode()
+        mask = os.urandom(4)
+        frame = bytearray([0x81])
+        if len(message) < 126:
+            frame.append(0x80 | len(message))
+        elif len(message) < 65536:
+            frame += bytes([0x80 | 126]) + struct.pack(">H", len(message))
+        else:
+            frame += bytes([0x80 | 127]) + struct.pack(">Q", len(message))
+        frame += mask + bytes(b ^ mask[i % 4] for i, b in enumerate(message))
+        s.sendall(frame)
+
+        def exact(n):
+            data = b""
+            while len(data) < n:
+                chunk = s.recv(n - len(data))
+                if not chunk:
+                    raise Failed("DevTools connection closed")
+                data += chunk
+            return data
+
+        while True:
+            b1, b2 = exact(2)
+            length = b2 & 0x7F
+            if length == 126:
+                length = struct.unpack(">H", exact(2))[0]
+            elif length == 127:
+                length = struct.unpack(">Q", exact(8))[0]
+            payload = exact(length)
+            if b1 & 0x0F != 1:
+                continue
+            reply = json.loads(payload)
+            if reply.get("id") == 1:
+                result = reply["result"]
+                if "exceptionDetails" in result:
+                    raise Failed("page error: " + json.dumps(result["exceptionDetails"])[:300])
+                return result["result"].get("value")
+
+
+# ---- the checks
+
+def find_adb():
+    sdk = os.environ.get("ANDROID_HOME", "/opt/android-sdk")
+    for candidate in (os.path.join(sdk, "platform-tools", "adb"), "adb"):
+        try:
+            subprocess.run([candidate, "version"], capture_output=True, check=True)
+            return candidate
+        except (OSError, subprocess.CalledProcessError):
+            pass
+    sys.exit("adb not found: install the Android platform tools or set ANDROID_HOME")
+
+
+USBIPD = "/mnt/c/Program Files/usbipd-win/usbipd.exe"
+
+
+def attach_usb_device(adb):
+    """WSL: attach an Android device that Windows has shared (usbipd bind, done once as admin)."""
+    if not os.path.exists(USBIPD):
+        return
+    listing = subprocess.run([USBIPD, "list"], capture_output=True, text=True).stdout
+    for line in listing.splitlines():
+        m = re.match(r"\s*(\d+-\d+)\s+([0-9a-f]{4}):([0-9a-f]{4})\s+(.*?)\s{2,}(Shared|Attached)", line, re.I)
+        name = m.group(4).lower() if m else ""
+        android = m and (m.group(2).lower() == "18d1" or "android" in name or "razer edge" in name or "adb" in name)
+        if android and m.group(5).lower() == "shared":
+            print(f"attaching {m.group(4).strip()} (USB {m.group(1)}) to WSL…")
+            subprocess.run([USBIPD, "attach", "--wsl", "--busid", m.group(1)], capture_output=True)
+            for _ in range(20):
+                out = subprocess.run([adb, "devices"], capture_output=True, text=True).stdout
+                if re.search(r"\n\S+\s+(device|unauthorized)", out):
+                    return
+                time.sleep(1)
+
+
+def adb_devices(adb):
+    out = subprocess.run([adb, "devices"], capture_output=True, text=True).stdout
+    ready = [l.split()[0] for l in out.splitlines()[1:] if l.strip().endswith("device")]
+    unauthorized = [l.split()[0] for l in out.splitlines()[1:] if "unauthorized" in l]
+    return ready, unauthorized
+
+
+def start_emulator(adb, avd):
+    """Boots an Android emulator with no window and waits until it is idle enough to test on."""
+    emulator = os.path.join(os.environ.get("ANDROID_HOME", "/opt/android-sdk"), "emulator", "emulator")
+    avds = subprocess.run([emulator, "-list-avds"], capture_output=True, text=True).stdout.split()
+    if not avds:
+        sys.exit("No device and no emulator (AVD) to fall back on; create one with avdmanager.")
+    avd = avd if avd in avds else ("tab" if "tab" in avds else avds[0])
+    print(f"no device ready — starting the '{avd}' emulator (a few minutes)…")
+    log = open(os.path.join(OUT, "emulator.log"), "w")
+    subprocess.Popen([emulator, "-avd", avd, "-no-window", "-no-audio", "-no-boot-anim", "-gpu", "swiftshader_indirect",
+                      "-memory", "3072", "-no-snapshot"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    end = time.time() + 600
+    serial = None
+    while time.time() < end:
+        ready, _ = adb_devices(adb)
+        serial = next((d for d in ready if d.startswith("emulator-")), None)
+        if serial:
+            booted = subprocess.run([adb, "-s", serial, "shell", "getprop", "sys.boot_completed"], capture_output=True, text=True)
+            if booted.stdout.strip() == "1":
+                break
+        time.sleep(5)
+    else:
+        sys.exit("the emulator did not start; see build/device-check/emulator.log")
+    # Let the first-boot work settle, and turn off animations so the checks don't wait on them.
+    while time.time() < end:
+        load = subprocess.run([adb, "-s", serial, "shell", "cat", "/proc/loadavg"], capture_output=True, text=True).stdout
+        if load and float(load.split()[0]) < 3:
+            break
+        time.sleep(5)
+    for setting in ("window_animation_scale", "transition_animation_scale", "animator_duration_scale"):
+        subprocess.run([adb, "-s", serial, "shell", "settings", "put", "global", setting, "0"], capture_output=True)
+    return serial
+
+
+def choose_device(adb, serial, connect, use_emulator, avd):
+    """A real device when one is connected and ready, otherwise an emulator. Returns (serial, started_emulator)."""
+    if connect:
+        subprocess.run([adb, "connect", connect], check=False)
+        serial = serial or connect
+    if not use_emulator:
+        attach_usb_device(adb)
+    ready, unauthorized = adb_devices(adb)
+    if serial:
+        if serial not in ready:
+            sys.exit(f"device {serial} is not connected")
+        return serial, False
+    physical = [d for d in ready if not d.startswith("emulator-")]
+    emulators = [d for d in ready if d.startswith("emulator-")]
+    if physical and not use_emulator:
+        if len(physical) > 1:
+            sys.exit("Several devices are connected; choose one with --serial: " + ", ".join(physical))
+        return physical[0], False
+    if unauthorized and not use_emulator:
+        print("note: a device is connected but hasn't allowed USB debugging yet (unlock it and tap "
+              "\"Always allow from this computer\" → Allow); using an emulator this time.")
+    elif not use_emulator:
+        print("note: no device ready (see README.md, \"Checking on a device\"); using an emulator.")
+    if emulators:
+        return emulators[0], False
+    return start_emulator(adb, avd), True
+
+
+def install(device, build):
+    if build:
+        print("building…")
+        subprocess.run([os.path.join(ROOT, "gradlew"), "assembleDebug", "-q"], cwd=ROOT, check=True)
+    abis = device.shell("getprop ro.product.cpu.abilist").strip().split(",")
+    folder = os.path.join(ROOT, "app", "build", "outputs", "apk", "debug")
+    for abi in abis:
+        apk = os.path.join(folder, f"app-{abi}-debug.apk")
+        if os.path.exists(apk):
+            print(f"installing {os.path.basename(apk)}…")
+            device.run("install", "-r", apk, timeout=600)
+            return
+    raise Failed(f"no debug APK for this device's CPU ({', '.join(abis)}); build first")
+
+
+def push_book(device, book):
+    files = []
+    for folder, _, names in os.walk(book):
+        for name in names:
+            if not name.endswith(":Zone.Identifier"):
+                files.append(os.path.relpath(os.path.join(folder, name), book))
+    have = device.shell(f"find {DEVICE_BOOK} -type f 2>/dev/null | wc -l", check=False).strip()
+    if have == str(len(files)):
+        return
+    print(f"copying {len(files)} book files to the device…")
+    device.shell(f"rm -rf {DEVICE_BOOK}", check=False)
+    for rel in files:
+        target = f"{DEVICE_BOOK}/{rel}"
+        device.shell(f"mkdir -p \"{os.path.dirname(target)}\"")
+        device.run("push", os.path.join(book, rel), target, timeout=600)
+
+
+def chapter_layout(book):
+    chapters = sorted((d for d in os.listdir(book) if os.path.isdir(os.path.join(book, d))), key=natural_key)
+    for chapter in chapters:
+        files = sorted((f for f in os.listdir(os.path.join(book, chapter)) if not f.endswith(":Zone.Identifier")), key=natural_key)
+        pdfs = [f for f in files if f.lower().endswith(".pdf")]
+        if pdfs:
+            return chapters, chapter, files, pdfs[0]
+    raise Failed("the test book has no chapter with a PDF")
+
+
+def check(name, results, device, fn):
+    print(f"• {name} … ", end="", flush=True)
+    try:
+        detail = fn()
+        shot = device.screenshot(re.sub(r"\W+", "-", name.lower()).strip("-"))
+        results.append((name, True, detail or "", shot))
+        print("PASS" + (f" ({detail})" if detail else ""))
+        return True
+    except Exception as e:  # noqa: BLE001 - report every failure the same way
+        shot = device.screenshot("FAILED-" + re.sub(r"\W+", "-", name.lower()).strip("-"))
+        results.append((name, False, str(e), shot))
+        print(f"FAIL: {e}")
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--serial", help="device to use (see `adb devices`)")
+    parser.add_argument("--connect", help="IP:PORT of a device paired for wireless debugging")
+    parser.add_argument("--no-build", action="store_true", help="don't build; install the existing debug APK")
+    parser.add_argument("--book", default=os.path.join(ROOT, "test"), help="book folder to test with (default: test/)")
+    parser.add_argument("--emulator", action="store_true", help="use an emulator even if a device is connected")
+    parser.add_argument("--avd", default="tab", help="emulator to start when no device is ready (default: tab)")
+    parser.add_argument("--keep-emulator", action="store_true", help="leave an emulator this script started running")
+    args = parser.parse_args()
+
+    os.makedirs(OUT, exist_ok=True)
+    for old in os.listdir(OUT):
+        os.remove(os.path.join(OUT, old))
+    if not os.path.isdir(args.book):
+        sys.exit(f"book folder {args.book} not found")
+
+    adb = find_adb()
+    serial, started_emulator = choose_device(adb, args.serial, args.connect, args.emulator, args.avd)
+    device = Device(adb, serial)
+    model = device.shell("getprop ro.product.model").strip()
+    android = device.shell("getprop ro.build.version.release").strip()
+    print(f"device: {model}, Android {android}")
+
+    device.shell("input keyevent KEYCODE_WAKEUP")
+    if "mDreamingLockscreen=true" in device.shell("dumpsys window") or "isStatusBarKeyguard=true" in device.shell("dumpsys window"):
+        device.shell("wm dismiss-keyguard", check=False)
+        time.sleep(1)
+    install(device, not args.no_build)
+    push_book(device, args.book)
+    chapters, chapter, chapter_files, pdf = chapter_layout(args.book)
+
+    results = []
+    device.shell(f"am force-stop {PACKAGE}")
+    device.shell(f"touch {DEVICE_BOOK}/.check-started")
+    device.shell(f"am start -n {MAIN}")
+    time.sleep(3)
+
+    # First run only: grant access to the book folder (the picker starts in Download).
+    if device.find(r"choose book folder"):
+        print("granting access to the book folder…")
+        device.tap(r"choose book folder")
+        device.tap(r"StudyBookCheck", timeout=60)
+        time.sleep(2)
+        device.tap(r"use this folder")
+        device.tap(r"allow")
+        time.sleep(3)
+
+    def chapters_in_order():
+        device.wait_for(re.escape(chapters[0]))
+        shown = [t for t, *_ in device.nodes() if t in chapters]
+        if not shown:
+            raise Failed("no chapters on screen")
+        if shown != chapters[: len(shown)]:
+            raise Failed(f"order on screen {shown} ≠ expected {chapters[: len(shown)]}")
+        return f"{len(shown)} shown, in order"
+
+    def chapter_lists_files():
+        device.tap(re.escape(chapter))
+        device.wait_for(re.escape(chapter_files[0]))
+        on_screen = {t for t, *_ in device.nodes()}
+        missing = [f for f in chapter_files if f not in on_screen]
+        if missing:
+            raise Failed(f"files not listed: {missing}")
+        return f"{chapter}: {len(chapter_files)} files"
+
+    def pdf_opens():
+        device.tap(re.escape(pdf))
+        node = device.wait_for(r"1 / \d+", timeout=60)
+        return f"{pdf} — page indicator {node[0]}"
+
+    practised = {}
+
+    def practise_from_pdf():
+        device.tap(r"writing practice")
+        device.wait_for(r"practise writing")
+        chips = [n for n in device.nodes() if len(n[0]) == 1 and re.match(r"[㐀-鿿\U00020000-\U0003ffff]", n[0])]
+        if not chips:
+            raise Failed("no Chinese characters listed for the page")
+        chip = next((c for c in chips if c[0] not in "姓名日期"), chips[0])
+        device.shell(f"input tap {chip[2]} {chip[3]}")
+        device.tap(r"practise \(1\)")
+        end = time.time() + 90
+        while "TrainingActivity" not in device.focused():
+            if time.time() > end:
+                raise Failed("writing practice did not open")
+            time.sleep(2)
+        practised["char"] = chip[0]
+        return f"{len(chips)} characters on the page; chose {chip[0]}"
+
+    def stroke_order_shown():
+        ch = practised["char"]
+        end = time.time() + 60
+        while True:
+            try:
+                value = devtools_eval(device, "(async()=>{ if(!state.ws||document.getElementById('practice').hidden) return null;"
+                                              " const d=await loadChar(state.ws.chars[pIndex]); return {ch: state.ws.chars[pIndex],"
+                                              " strokes: d ? d.strokes.length : 0, status: document.getElementById('pStatus').textContent} })()")
+                if value:
+                    break
+            except Exception:  # noqa: BLE001 - the page may still be loading
+                value = None
+            if time.time() > end:
+                raise Failed("practice panel did not open")
+            time.sleep(2)
+        if value["ch"] != ch:
+            raise Failed(f"practising {value['ch']}, expected {ch}")
+        if value["strokes"] <= 0:
+            raise Failed(f"no stroke data for {ch}")
+        return f"{ch}: {value['strokes']} strokes — {value['status']}"
+
+    def save_pdf():
+        devtools_eval(device, "(()=>{ closePractice(); document.getElementById('printBtn').click();"
+                              " setTimeout(()=>document.querySelector('[data-print=blank]').click(), 300); return 1 })()")
+        device.wait_for(r"save as pdf|select a printer|all printers.*", timeout=60)
+        if not device.find(r"save as pdf"):
+            device.tap(r"select a printer|.*printer.*")
+            device.tap(r"save as pdf")
+        device.tap(r"save to pdf", timeout=60)
+        device.tap(r"save", timeout=60)
+        end = time.time() + 60
+        newest = ""
+        while time.time() < end:
+            newest = device.shell(f"find /sdcard/Download /sdcard/Documents -name '*.pdf' -newer {DEVICE_BOOK}/.check-started 2>/dev/null",
+                                  check=False).strip().splitlines()
+            if newest:
+                break
+            time.sleep(2)
+        if not newest:
+            raise Failed("no PDF was saved")
+        target = newest[0]
+        # Android creates the file first and fills it in afterwards: wait until its size stops changing.
+        last = -1
+        while time.time() < end + 60:
+            size = int(device.shell(f"stat -c %s \"{target}\"", check=False).strip() or 0)
+            if size > 0 and size == last:
+                break
+            last = size
+            time.sleep(2)
+        local = os.path.join(OUT, "worksheet.pdf")
+        device.run("pull", target, local)
+        device.shell(f"rm \"{target}\"", check=False)
+        data = open(local, "rb").read()
+        box = re.search(rb"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]", data)
+        if not box:
+            raise Failed("saved file is not a readable PDF")
+        size = (round(float(box.group(1))), round(float(box.group(2))))
+        if size != (612, 792):
+            raise Failed(f"page size {size} points, expected US Letter (612, 792)")
+        return f"US Letter, {len(data) // 1024} KB"
+
+    ok = (check("Chapters are listed in order", results, device, chapters_in_order)
+          and check("A chapter lists its files", results, device, chapter_lists_files)
+          and check("A PDF opens", results, device, pdf_opens)
+          and check("Practise writing from the PDF", results, device, practise_from_pdf)
+          and check("Stroke order is shown", results, device, stroke_order_shown)
+          and check("Worksheet saves as a PDF", results, device, save_pdf))
+
+    device.shell(f"am force-stop {PACKAGE}", check=False)
+    if started_emulator and not args.keep_emulator:
+        device.run("emu", "kill", check=False)
+    with open(os.path.join(OUT, "summary.txt"), "w") as f:
+        f.write(f"{model}, Android {android}\n")
+        for name, passed, detail, shot in results:
+            f.write(f"{'PASS' if passed else 'FAIL'}  {name}  {detail}  [{os.path.basename(shot)}]\n")
+    print(f"\n{'All checks passed' if ok else 'Some checks FAILED'} — screenshots in {os.path.relpath(OUT, ROOT)}/")
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Failed as e:
+        sys.exit(f"error: {e}")

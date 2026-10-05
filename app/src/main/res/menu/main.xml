@@ -1,0 +1,15 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/writing_practice"
+        android:icon="@drawable/ic_pen"
+        android:title="@string/writing_practice"
+        app:iconTint="?attr/colorOnPrimary"
+        app:showAsAction="always|withText" />
+    <item
+        android:id="@+id/change_folder"
+        android:icon="@drawable/ic_folder"
+        android:title="@string/change_folder"
+        app:iconTint="?attr/colorOnPrimary"
+        app:showAsAction="ifRoom" />
+</menu>
