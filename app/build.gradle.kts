@@ -88,4 +88,6 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("net.sf.kxml:kxml2:2.3.0")
+    // The real org.json, as android.jar only has stubs in unit tests (for Backup).
+    testImplementation("org.json:json:20240303")
 }

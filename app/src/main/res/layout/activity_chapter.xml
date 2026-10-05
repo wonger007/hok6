@@ -197,11 +197,22 @@
                         android:contentDescription="@string/undo"
                         android:src="@drawable/ic_undo" />
 
-                    <ImageButton
+                    <TextView
                         android:id="@+id/ink_clear"
-                        style="@style/ToolButton"
-                        android:contentDescription="@string/clear_page"
-                        android:src="@drawable/ic_delete" />
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:contentDescription="@string/clear_screen"
+                        android:drawablePadding="4dp"
+                        android:gravity="center"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="14dp"
+                        android:text="@string/clear"
+                        android:textColor="#C62828"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:drawableStartCompat="@drawable/ic_delete"
+                        app:drawableTint="#C62828" />
                 </LinearLayout>
             </LinearLayout>
         </FrameLayout>

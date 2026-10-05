@@ -72,6 +72,11 @@
       </div>
       <ul id="histList" class="items"></ul>
       <p id="histEmpty" class="muted">Words and characters you practise appear here. Tap one to practise it again; tap ☆ to bookmark it.</p>
+      <div id="backupRow" class="backup-row" hidden>
+        <span class="muted">Your history, bookmarks, writing and tracing, saved to a file:</span>
+        <button id="backUpBtn" class="small">Back up…</button>
+        <button id="restoreBtn" class="small">Restore…</button>
+      </div>
     </section>
 
 
@@ -102,7 +107,7 @@
       <button class="icon" id="sizeBtn" aria-label="Pen size">◍</button>
       <button class="icon" id="eraserBtn" aria-label="Eraser">⌫</button>
       <button class="icon" id="undoBtn" aria-label="Undo">↶</button>
-      <button class="icon" id="clearBtn" aria-label="Clear writing">🗑</button>
+      <button class="clear-btn" id="clearBtn" aria-label="Clear: erase all writing on screen">🗑 Clear</button>
     </div>
     <div class="group">
       <button class="icon" id="viewBtn" aria-label="Show whole pages">📄</button>
@@ -175,7 +180,7 @@
   </div>
 </div>
 
-<!-- Export: print, or share a PDF with another app (nothing is kept) -->
+<!-- Export: print, or share a PDF with another app -->
 <div id="printDialog" class="modal" hidden>
   <div class="modal-card small-card">
     <h2>Export worksheet</h2>

@@ -71,12 +71,13 @@ class InkDocument private constructor(private val file: File) {
         return true
     }
 
-    fun clear(page: Int) {
-        val list = pages[page] ?: return
-        if (list.isEmpty()) return
-        val old = list.toList()
-        list.clear()
-        record { list.addAll(old) }
+    /** Clears these pages as one step (one Undo brings them all back). Returns false if there was nothing to clear. */
+    fun clear(pageNumbers: Collection<Int>): Boolean {
+        val old = pageNumbers.mapNotNull { p -> pages[p]?.takeIf { it.isNotEmpty() }?.let { p to it.toList() } }
+        if (old.isEmpty()) return false
+        for ((p, _) in old) pages[p]?.clear()
+        record { for ((p, strokes) in old) pages.getOrPut(p) { mutableListOf() }.addAll(strokes) }
+        return true
     }
 
     fun undo(): Boolean {

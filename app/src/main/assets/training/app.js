@@ -19,26 +19,50 @@ const PX_PER_MM = (Native && Native.cssPxPerMm && Number(Native.cssPxPerMm())) |
 
 const $ = (id) => document.getElementById(id);
 
+/* Saved data (history, bookmarks, writing, settings). In the app it is kept in the app's own storage, which Android
+   backs up; this page's localStorage is only used in a plain browser. Values are cached, as this page is the only writer. */
+const NativeStore = Native && Native.storeGet ? Native : null;
+const storeCache = new Map();
+
 const store = {
   get(key, fallback) {
-    try {
-      const v = localStorage.getItem(key);
-      return v == null ? fallback : JSON.parse(v);
-    } catch (e) {
-      return fallback;
+    if (!storeCache.has(key)) {
+      let raw = null;
+      try { raw = NativeStore ? NativeStore.storeGet(key) : localStorage.getItem(key); } catch (e) { /* ignore */ }
+      storeCache.set(key, raw == null ? undefined : raw);
     }
+    const v = storeCache.get(key);
+    if (v === undefined) return fallback;
+    try { return JSON.parse(v); } catch (e) { return fallback; }
   },
   set(key, value) {
+    const v = JSON.stringify(value);
+    storeCache.set(key, v);
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      if (NativeStore) NativeStore.storeSet(key, v); else localStorage.setItem(key, v);
     } catch (e) {
       toast('Could not save — storage is full');
     }
   },
   del(key) {
-    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+    storeCache.set(key, undefined);
+    try {
+      if (NativeStore) NativeStore.storeDel(key); else localStorage.removeItem(key);
+    } catch (e) { /* ignore */ }
   },
 };
+
+/* Earlier versions kept everything in localStorage, which is lost when the app is reinstalled; move it to the app. */
+(function moveToAppStorage() {
+  if (!NativeStore) return;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (NativeStore.storeGet(key) == null) NativeStore.storeSet(key, localStorage.getItem(key));
+    }
+    localStorage.clear();
+  } catch (e) { /* ignore */ }
+}());
 
 const DEFAULT_OPTS = { size: 'large', grid: 'mi', strokes: true, roman: true, name: true };
 
@@ -355,9 +379,50 @@ function redrawInk(page) {
   }
 }
 
-/* Worksheets aren't saved (History keeps the words), so writing lasts only while the worksheet is open. */
-function saveInkSoon() {}
-function saveInk() {}
+/* Writing is kept for each word (at each box size) for the last INK_KEEP words written on, so it's there next time. */
+const INK_KEEP = 60;
+const inkDirty = new Set();
+let inkTimer = 0;
+
+function inkKey(page) {
+  const ws = state.ws;
+  return `ink:${ws.words[page]}|${ws.opts.size}|${ws.opts.strokes ? 's' : '-'}`;
+}
+
+function loadInk() {
+  state.ink = {};
+  inkDirty.clear();
+  state.ws.words.forEach((w, p) => {
+    const strokes = store.get(inkKey(p), null);
+    if (strokes && strokes.length) state.ink[p] = strokes;
+  });
+}
+
+function saveInkSoon(page) {
+  inkDirty.add(page);
+  clearTimeout(inkTimer);
+  inkTimer = setTimeout(saveInk, 800);
+}
+
+function saveInk() {
+  clearTimeout(inkTimer);
+  if (!state.ws || !inkDirty.size) return;
+  let recent = store.get('inkRecent', []);
+  for (const p of inkDirty) {
+    const key = inkKey(p);
+    const strokes = state.ink[p] || [];
+    recent = recent.filter((k) => k !== key);
+    if (strokes.length) {
+      store.set(key, strokes);
+      recent.unshift(key);
+    } else {
+      store.del(key);
+    }
+  }
+  inkDirty.clear();
+  for (const old of recent.slice(INK_KEEP)) store.del(old);
+  store.set('inkRecent', recent.slice(0, INK_KEEP));
+}
 
 function strokeHits(s, x, y, r) {
   const p = s.p;
@@ -381,7 +446,7 @@ function eraseAt(page, x, y) {
   state.ink[page] = list.filter((s) => !hit.includes(s));
   state.undo.push({ type: 'erase', page, strokes: hit });
   redrawInk(page);
-  saveInkSoon();
+  saveInkSoon(page);
 }
 
 function toPage(svg, e) {
@@ -534,7 +599,7 @@ function setupInk(pages) {
         const stroke = { c: active.color, w: active.w, p: active.p };
         (state.ink[active.page] = state.ink[active.page] || []).push(stroke);
         state.undo.push({ type: 'add', page: active.page, stroke });
-        saveInkSoon();
+        saveInkSoon(active.page);
       }
     }
     active = null;
@@ -549,24 +614,23 @@ function undo() {
   if (a.type === 'add') {
     state.ink[a.page] = (state.ink[a.page] || []).filter((s) => s !== a.stroke);
     redrawInk(a.page);
-  } else if (a.type === 'erase') {
+  } else if (a.type === 'erase' || a.type === 'clear') {
     state.ink[a.page] = (state.ink[a.page] || []).concat(a.strokes);
     redrawInk(a.page);
-  } else if (a.type === 'clear') {
-    state.ink = a.ink;
-    Object.keys(state.ink).forEach((p) => redrawInk(Number(p)));
   }
-  saveInkSoon();
+  saveInkSoon(a.page);
 }
 
-function clearAll() {
-  if (!Object.values(state.ink).some((l) => l.length)) return;
-  if (!confirm('Clear all your writing on this worksheet?')) return;
-  const old = state.ink;
-  state.undo.push({ type: 'clear', ink: old });
-  state.ink = {};
-  Object.keys(old).forEach((p) => redrawInk(Number(p)));
-  saveInkSoon();
+/* Clears all the writing on screen (the word shown, on its page or in the phone squares); Undo brings it back. */
+function clearScreen() {
+  const page = state.row;
+  const old = state.ink[page] || [];
+  if (!old.length) return toast('Nothing to clear');
+  state.undo.push({ type: 'clear', page, strokes: old });
+  state.ink[page] = [];
+  redrawInk(page);
+  saveInkSoon(page);
+  toast('Cleared — tap ↶ to undo');
 }
 
 // ---------------------------------------------------------------- speech & language
@@ -716,10 +780,15 @@ function setupLists() {
     b.onclick = () => { state.historyFilter = b.dataset.filter; renderLists(); };
   });
   $('histClear').onclick = () => {
-    if (!confirm('Clear your practice history? Bookmarks and worksheets are kept.')) return;
+    if (!confirm('Clear your practice history? Bookmarks and writing are kept.')) return;
     store.del('history');
     renderLists();
   };
+  if (Native && Native.backUp) {
+    $('backupRow').hidden = false;
+    $('backUpBtn').onclick = () => { saveInk(); Native.backUp(); };
+    $('restoreBtn').onclick = () => Native.restore();
+  }
   $('bmPractise').onclick = () => {
     const all = bookmarks().join('');
     if (all) practiseText('★ Bookmarks ' + new Date().toLocaleDateString(), all, false);
@@ -917,7 +986,7 @@ function setupPrint() {
   });
 }
 
-/* Draws each page to an image and hands them to the app, which makes a PDF and opens Android's share menu. */
+/* Hands each page to the app as shapes and text, which it draws into a PDF and opens Android's share menu with. */
 async function sharePdf(name, blank) {
   if (!Native || !Native.shareStart) return toast('Sharing needs the app');
   const status = $('exportStatus');
@@ -926,40 +995,77 @@ async function sharePdf(name, blank) {
   Native.shareStart(name);
   for (let i = 0; i < pages.length; i++) {
     status.textContent = `Preparing page ${i + 1} of ${pages.length}…`;
-    Native.sharePage(await pageImage(pages[i], blank));
+    Native.sharePage(JSON.stringify(pageDrawing(pages[i], blank)));
+    await new Promise((r) => setTimeout(r, 0));
   }
   status.textContent = 'Opening share…';
   Native.shareFinish();
 }
 
-/* One page as a PNG (base64), about 190 dpi on US Letter. */
-function pageImage(svg, blank) {
-  const scale = 2;
-  const width = 816 * scale, height = 1056 * scale;
-  const copy = svg.cloneNode(true);
-  copy.setAttribute('width', width);
-  copy.setAttribute('height', height);
-  copy.setAttribute('xmlns', SVGNS);
-  if (blank) copy.querySelectorAll('.ink').forEach((n) => n.remove());
-  const style = document.createElementNS(SVGNS, 'style');
-  style.textContent = 'text{font-family:"Noto Serif CJK HK","Noto Serif CJK TC",serif}.roman,.head-latin{font-family:"Noto Sans",Roboto,sans-serif}.roman{fill:#333}';
-  copy.insertBefore(style, copy.firstChild);
-  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy));
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/png').split(',')[1]);
+/*
+ * One page as a list of shapes in page millimetres, with each one's transform, for PageDrawing.kt to draw as sharp
+ * lines and real text. Repeated outlines (the same character in many squares) are sent once, in `paths`.
+ */
+function pageDrawing(svg, blank) {
+  const paths = [], pathIndex = new Map(), ops = [];
+  const round = (v) => Math.round(v * 1e4) / 1e4;
+  const num = (node, attr) => Number(node.getAttribute(attr)) || 0;
+  const paint = (node, attr, fallback) => {
+    const v = node.getAttribute(attr);
+    if (v == null) return fallback;
+    return v === 'none' ? null : v;
+  };
+  const strokeOf = (node) => {
+    const dash = node.getAttribute('stroke-dasharray');
+    return {
+      stroke: paint(node, 'stroke', null),
+      sw: num(node, 'stroke-width') || 1,
+      cap: node.getAttribute('stroke-linecap') || undefined,
+      dash: dash ? dash.trim().split(/[\s,]+/).map(Number) : undefined,
     };
-    img.onerror = reject;
-    img.src = url;
-  });
+  };
+  const walk = (node, m) => {
+    for (const child of node.children) {
+      if (blank && child.classList.contains('ink')) continue;
+      let cm = m;
+      const list = child.transform && child.transform.baseVal;
+      for (let i = 0; list && i < list.numberOfItems; i++) {
+        const t = list.getItem(i).matrix;
+        cm = cm.multiply(new DOMMatrix([t.a, t.b, t.c, t.d, t.e, t.f]));
+      }
+      const at = [cm.a, cm.b, cm.c, cm.d, cm.e, cm.f].map(round);
+      switch (child.localName) {
+        case 'g':
+          walk(child, cm);
+          break;
+        case 'rect':
+          ops.push({ k: 'rect', m: at, x: num(child, 'x'), y: num(child, 'y'), w: num(child, 'width'), h: num(child, 'height'), fill: paint(child, 'fill', '#000') });
+          break;
+        case 'line':
+          ops.push(Object.assign({ k: 'line', m: at, x1: num(child, 'x1'), y1: num(child, 'y1'), x2: num(child, 'x2'), y2: num(child, 'y2') }, strokeOf(child)));
+          break;
+        case 'path': {
+          const d = child.getAttribute('d');
+          if (!pathIndex.has(d)) { pathIndex.set(d, paths.length); paths.push(d); }
+          ops.push(Object.assign({ k: 'path', m: at, d: pathIndex.get(d), fill: paint(child, 'fill', '#000') }, strokeOf(child)));
+          break;
+        }
+        case 'text': {
+          const latin = child.classList.contains('roman') || child.classList.contains('head-latin');
+          ops.push({
+            k: 'text', m: at, x: num(child, 'x'), y: num(child, 'y'), s: child.textContent, size: num(child, 'font-size'),
+            anchor: child.getAttribute('text-anchor') || 'start', font: latin ? 'sans' : 'serif',
+            fill: paint(child, 'fill', child.classList.contains('roman') ? '#333' : '#000'),
+          });
+          break;
+        }
+        default:
+          break;
+      }
+    }
+  };
+  walk(svg, new DOMMatrix());
+  return { w: PAGE_W, h: PAGE_H, lang: state.lang, paths, ops };
 }
 
 window.afterPrint = function afterPrint() {
@@ -1010,7 +1116,8 @@ function setupHome() {
   });
 }
 
-/* A worksheet for the given characters. Nothing is stored except its words (in History) and its options (as defaults). */
+/* A worksheet for the given characters. Only its words (in History), its options (as defaults) and the writing on each
+   word are stored, so practising a word again brings back what was written on it. */
 function createWorksheet(title, chars, words, opts) {
   store.set('lastOpts', opts);
   return {
@@ -1147,7 +1254,7 @@ function renderTranslations() {
 
 async function openSheet(ws) {
   state.ws = ws;
-  state.ink = {};
+  loadInk();
   state.undo = [];
   state.row = 0;
   $('home').hidden = true;
@@ -1193,7 +1300,7 @@ function setupSheet() {
   $('sizeBtn').onclick = () => { state.size = (state.size + 1) % PEN_SIZES.length; state.tool = 'pen'; updateTools(); };
   $('eraserBtn').onclick = () => { state.tool = state.tool === 'eraser' ? 'pen' : 'eraser'; updateTools(); };
   $('undoBtn').onclick = undo;
-  $('clearBtn').onclick = clearAll;
+  $('clearBtn').onclick = clearScreen;
   $('fingerBtn').onclick = () => setFingerDraw(!state.fingerDraw, true);
   $('zoomIn').onclick = () => setZoom(state.zoom * 1.25);
   $('zoomOut').onclick = () => setZoom(state.zoom / 1.25);

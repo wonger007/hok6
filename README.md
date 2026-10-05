@@ -6,7 +6,8 @@ An Android tablet app for working through a Chinese (Cantonese or Mandarin) stud
 - **PDF** pages rendered in the app, with zoom and remembered position.
 - **Word (.docx)** shown as text in the app, keeping headings, bold/italic, tables and ruby (pinyin/jyutping) annotations.
 - **Audio** (mp3, m4a, wav, …) as a chapter playlist with a player bar, speed control, repeat-one and lock-screen controls.
-- **Tracing** on PDFs and Word documents with finger or stylus (pens, eraser, undo); saved per page.
+- **Tracing** on PDFs and Word documents with finger or stylus (pens, eraser, undo, and **Clear** to erase everything
+  on screen at once); saved per page.
 - **Practise mode (字)** on PDFs and Word documents: tap a character to open writing practice for it; scanned pages are read with on-device text recognition (only one of Trace / Practise is on at a time; the active one is shown solid).
 - **Writing practice** worksheets:
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;
@@ -15,9 +16,16 @@ An Android tablet app for working through a Chinese (Cantonese or Mandarin) stud
   - pronunciation: hear each character and the word it belongs to, at normal or slow speed, with tone names (e.g. nei5 · tone 5, low rising);
   - type English to get Chinese words (Cantonese or Mandarin, following the language switch), from an offline dictionary;
   - history of practised words and characters (with quiz results) and bookmarks in one list, each one tap away from a fresh
-    worksheet (worksheets themselves aren't stored);
-  - export: print, or share a PDF (US Letter, 8.5 × 11 in) with another app such as Gmail or WhatsApp, blank or with your writing;
+    worksheet;
+  - your writing is kept for each word (the last 60 words written on), so it's still there when you practise that word
+    again; **Clear** erases everything on screen (Undo brings it back);
+  - export: print, or share a PDF (US Letter, 8.5 × 11 in, sharp lines and real text) with another app such as Gmail or
+    WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).
+- **Your work is backed up**: writing practice history, bookmarks and writing, and tracing are kept in the app's own
+  storage, included in Android's backup and in transfers to a new device. **Back up my work…** / **Restore my work…**
+  (main screen menu, or under History in writing practice) also save it all to one file you keep, e.g. before
+  reinstalling. Restoring adds to what's there: history and bookmarks are combined.
 
 ## Building
 

@@ -29,10 +29,10 @@
     <string name="pen_size">Pen size</string>
     <string name="eraser">Eraser</string>
     <string name="undo">Undo</string>
-    <string name="clear_page">Clear tracing on this page</string>
-    <string name="clear_page_confirm">Clear all tracing on this page?</string>
-    <string name="clear_doc_confirm">Clear all tracing in this document?</string>
+    <string name="clear_screen">Clear: erase all tracing on screen</string>
     <string name="clear">Clear</string>
+    <string name="cleared">Tracing cleared</string>
+    <string name="nothing_to_clear">Nothing to clear on screen</string>
     <string name="trace_on_hint">Trace mode: draw with one finger or a stylus, scroll with two fingers</string>
     <string name="writing_practice">Writing practice</string>
     <string name="tts_missing">No %1$s voice is installed. Add one in Settings → Text-to-speech (Google Speech Services → Install voice data).</string>
@@ -49,4 +49,10 @@
     <string name="practise_miss">Tap right on a Chinese character</string>
     <string name="share_worksheet">Share worksheet</string>
     <string name="share_failed">Couldn\'t make the PDF</string>
+    <string name="back_up">Back up my work…</string>
+    <string name="restore">Restore my work…</string>
+    <string name="backup_saved">Backup saved. Keep it somewhere safe (e.g. Google Drive) to restore after reinstalling.</string>
+    <string name="backup_failed">Couldn\'t save the backup</string>
+    <string name="backup_restored">Restored: %1$d words in history, tracing on %2$d files</string>
+    <string name="backup_not_valid">That file isn\'t a Study Book backup</string>
 </resources>

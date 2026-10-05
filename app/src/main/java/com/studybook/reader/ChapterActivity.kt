@@ -19,13 +19,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -311,16 +311,16 @@ class ChapterActivity : AppCompatActivity() {
         findViewById<View>(R.id.ink_undo).setOnClickListener {
             if (ink.document?.undo() == true) invalidateInk()
         }
+        // Clears everything on screen at once (a Word document is one long page); Undo brings it back.
         findViewById<View>(R.id.ink_clear).setOnClickListener {
             val doc = ink.document ?: return@setOnClickListener
-            val isPdf = pdfFrame.isVisible
-            AlertDialog.Builder(this)
-                .setMessage(if (isPdf) R.string.clear_page_confirm else R.string.clear_doc_confirm)
-                .setPositiveButton(R.string.clear) { _, _ ->
-                    doc.clear(if (isPdf) pdf.middlePage else 0)
-                    invalidateInk()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
+            if (!doc.clear(if (pdfFrame.isVisible) pdf.pagesOnScreen else listOf(0))) {
+                Toast.makeText(this, R.string.nothing_to_clear, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            invalidateInk()
+            Snackbar.make(findViewById(R.id.content_pane), R.string.cleared, Snackbar.LENGTH_LONG)
+                .setAction(R.string.undo) { if (doc.undo()) invalidateInk() }
                 .show()
         }
         updateInkTools()

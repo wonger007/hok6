@@ -56,6 +56,10 @@ button:disabled { opacity: 0.4; }
 .bar .group { display: flex; align-items: center; background: rgba(255,255,255,0.14); border-radius: 999px; padding: 0 4px; }
 .bar .group button.icon.sel, .bar .group button.pen.sel { background: rgba(255,255,255,0.35); }
 .bar button.primary { background: #fff; color: var(--brand); border-color: #fff; font-weight: 600; }
+.bar button.clear-btn {
+  border: none; background: #fff; color: var(--brand); font-weight: 600;
+  min-height: 36px; padding: 0 14px; margin: 0 4px;
+}
 button.pen { border: none; background: transparent; min-width: 44px; padding: 0; }
 button.pen i { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; vertical-align: middle; }
 
@@ -129,6 +133,8 @@ svg.page .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; 
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .card-head h2 { margin: 0; }
 button.small { min-height: 36px; padding: 6px 14px; font-size: 14px; }
+.backup-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.backup-row .muted { flex: 1; min-width: 200px; font-size: 14px; }
 .filters { display: flex; gap: 6px; margin-bottom: 8px; }
 .filters button { min-height: 34px; padding: 4px 14px; font-size: 14px; }
 .filters button.sel { background: var(--brand); border-color: var(--brand); color: #fff; }

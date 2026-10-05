@@ -58,6 +58,17 @@ class PdfViewer(
         get() = pages.findChildViewUnder(pages.width / 2f, pages.height / 2f)
             ?.let { pages.getChildAdapterPosition(it) }?.takeIf { it >= 0 } ?: currentPage
 
+    /** Pages showing on screen: those filling at least a fifth of it, and always the one in the middle. */
+    val pagesOnScreen: List<Int>
+        get() {
+            val height = pages.height.coerceAtLeast(1)
+            val shown = (0 until pages.childCount).map { pages.getChildAt(it) }.filter { child ->
+                val visible = minOf(child.bottom, height) - maxOf(child.top, 0)
+                visible >= height / 5 || visible >= child.height / 2
+            }.mapNotNull { pages.getChildAdapterPosition(it).takeIf { p -> p >= 0 } }
+            return (shown + middlePage).distinct().sorted()
+        }
+
     init {
         pages.layoutManager = layoutManager
         pages.adapter = adapter

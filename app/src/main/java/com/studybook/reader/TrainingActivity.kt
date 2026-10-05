@@ -22,11 +22,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
 import android.content.Intent
-import android.graphics.BitmapFactory
-import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.pdf.PdfDocument
-import android.util.Base64
 import androidx.core.content.FileProvider
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -49,7 +45,11 @@ class TrainingActivity : AppCompatActivity() {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var exportPdf: PdfDocument? = null
+    private var exportFailed = false
     private var exportName = "worksheet"
+    private val store by lazy { TrainingStore(this) }
+    // After a restore, reload the page so it shows the restored history and writing.
+    private val backup = BackupActions(this) { web.reload() }
     private var pendingSpeech: Triple<String, String, Float>? = null
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -183,31 +183,37 @@ class TrainingActivity : AppCompatActivity() {
         @JavascriptInterface
         fun close() = runOnUiThread { finish() }
 
-        /** Share PDF: the page sends each worksheet page as a PNG, then [shareFinish] opens the share menu. */
+        /** Share PDF: the page sends each worksheet page as shapes and text (see [PageDrawing]), then [shareFinish] opens the share menu. */
         @JavascriptInterface
         fun shareStart(name: String) {
             exportName = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifEmpty { "worksheet" }
             exportPdf?.close()
             exportPdf = PdfDocument()
+            exportFailed = false
         }
 
         @JavascriptInterface
-        fun sharePage(pngBase64: String) {
+        fun sharePage(drawing: String) {
             val pdf = exportPdf ?: return
-            val bytes = Base64.decode(pngBase64, Base64.DEFAULT)
-            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
-            // US Letter in points; the image fills the page.
+            // US Letter in points.
             val page = pdf.startPage(PdfDocument.PageInfo.Builder(612, 792, pdf.pages.size + 1).create())
-            page.canvas.drawBitmap(bitmap, null, Rect(0, 0, 612, 792), Paint(Paint.FILTER_BITMAP_FLAG))
-            pdf.finishPage(page)
-            bitmap.recycle()
+            try {
+                PageDrawing.draw(page.canvas, drawing, 612f)
+            } catch (e: Exception) {
+                exportFailed = true
+            } finally {
+                pdf.finishPage(page)
+            }
         }
 
         @JavascriptInterface
         fun shareFinish() {
             val pdf = exportPdf ?: return
             exportPdf = null
-            val file = try {
+            val file = if (exportFailed) {
+                pdf.close()
+                null
+            } else try {
                 // Only the latest export is kept, in the app's cache, for the app it was shared with to read.
                 val dir = File(cacheDir, "exports").apply { deleteRecursively(); mkdirs() }
                 File(dir, "$exportName.pdf").also { out -> out.outputStream().use { pdf.writeTo(it) } }
@@ -230,6 +236,22 @@ class TrainingActivity : AppCompatActivity() {
                 startActivity(Intent.createChooser(send, getString(R.string.share_worksheet)))
             }
         }
+
+        /** Writing practice data, kept in app storage (see [TrainingStore]); null when there's none. */
+        @JavascriptInterface
+        fun storeGet(key: String): String? = store.get(key)
+
+        @JavascriptInterface
+        fun storeSet(key: String, value: String) = store.set(key, value)
+
+        @JavascriptInterface
+        fun storeDel(key: String) = store.delete(key)
+
+        @JavascriptInterface
+        fun backUp() = runOnUiThread { backup.backUp() }
+
+        @JavascriptInterface
+        fun restore() = runOnUiThread { backup.restore() }
 
         @JavascriptInterface
         fun initialText(): String = intent.getStringExtra(EXTRA_TEXT).orEmpty()

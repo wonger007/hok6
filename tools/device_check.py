@@ -12,8 +12,9 @@ copies the book in test/ to Download/StudyBookCheck on the device, and then chec
   4. Practise writing lists the characters on the page and opens writing practice for one
   5. the practice panel shows that character's stroke order (from the bundled stroke data)
   6. Export → Print / Save as PDF produces a US Letter PDF
-  7. Export → Share PDF opens Android's share menu with a US Letter PDF
-  8. typing English ("thank you") suggests Chinese words
+  7. Export → Share PDF opens Android's share menu with a US Letter PDF drawn as lines and text (not a picture)
+  8. writing on a worksheet is kept in app storage when the word is practised again; Clear erases it and Undo restores it
+  9. typing English ("thank you") suggests Chinese words
 
 Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
 
@@ -556,9 +557,35 @@ def main():
             raise Failed("no PDF was made for sharing")
         data = device.run("exec-out", "run-as", PACKAGE, "cat", f"cache/exports/{files[0]}", binary=True)
         device.shell("input keyevent KEYCODE_BACK")
+        with open(os.path.join(OUT, "shared.pdf"), "wb") as f:
+            f.write(data)
         if pdf_size(data) != (612, 792):
             raise Failed(f"page size {pdf_size(data)}, expected US Letter (612, 792)")
-        return f"share menu opened with {files[0]} ({len(data) // 1024} KB, US Letter)"
+        if re.search(rb"/Subtype\s*/Image", data):
+            raise Failed("the shared PDF is a picture of the page, not lines and text")
+        if not re.search(rb"/Font\b", data):
+            raise Failed("the shared PDF has no text")
+        return f"share menu opened with {files[0]} ({len(data) // 1024} KB, US Letter, lines and text)"
+
+    def writing_kept_and_cleared():
+        # Write a stroke on the word shown, practise the same word again, then Clear and Undo.
+        value = devtools_eval(device, "(async()=>{ const p=state.row, ws=state.ws;"
+                                      " (state.ink[p]=state.ink[p]||[]).push({c:'#212121',w:0.8,p:[40,60,60,80,80,70]});"
+                                      " redrawInk(p); saveInkSoon(p); saveInk();"
+                                      " const stored=Native.storeGet(inkKey(p))!=null;"
+                                      " closeSheet(); await openSheet(ws); const kept=(state.ink[p]||[]).length;"
+                                      " document.getElementById('clearBtn').click();"
+                                      " const left=(state.ink[p]||[]).length+pageSvg(p).querySelectorAll('.ink path').length;"
+                                      " document.getElementById('undoBtn').click(); const back=pageSvg(p).querySelectorAll('.ink path').length;"
+                                      " document.getElementById('clearBtn').click(); saveInk();"
+                                      " return {stored, kept, left, back, gone: Native.storeGet(inkKey(p))==null} })()", timeout=60)
+        if not value or not value["stored"]:
+            raise Failed(f"writing was not saved in app storage: {value}")
+        if value["kept"] < 1:
+            raise Failed("writing was gone when the word was practised again")
+        if value["left"] != 0 or value["back"] < 1 or not value["gone"]:
+            raise Failed(f"Clear / Undo didn't work: {value}")
+        return f"kept {value['kept']} stroke(s) after reopening; Clear erased them, Undo brought them back"
 
     def english_lookup():
         value = devtools_eval(device, "(async()=>{ if(!document.getElementById('sheet').hidden) closeSheet();"
@@ -578,6 +605,7 @@ def main():
           and check("Stroke order is shown", results, device, stroke_order_shown)
           and check("Worksheet saves as a PDF", results, device, save_pdf)
           and check("Worksheet shares as a PDF", results, device, share_pdf)
+          and check("Writing is kept; Clear erases it", results, device, writing_kept_and_cleared)
           and check("English is looked up", results, device, english_lookup))
 
     device.shell(f"am force-stop {PACKAGE}", check=False)

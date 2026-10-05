@@ -12,4 +12,12 @@
         android:title="@string/change_folder"
         app:iconTint="?attr/colorOnPrimary"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/back_up"
+        android:title="@string/back_up"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/restore"
+        android:title="@string/restore"
+        app:showAsAction="never" />
 </menu>

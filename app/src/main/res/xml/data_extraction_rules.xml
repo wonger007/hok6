@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android backup and transfer to a new device (Android 12+): writing practice data and tracing; not settings such as
+     the book folder, whose access permission doesn't carry over. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="training/" />
+        <include domain="file" path="ink/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="training/" />
+        <include domain="file" path="ink/" />
+    </device-transfer>
+</data-extraction-rules>

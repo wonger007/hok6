@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var message: TextView
     private val adapter = ChapterAdapter { openChapter(it) }
     private var treeUri: Uri? = null
+    private val backup = BackupActions(this)
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -80,6 +81,8 @@ class MainActivity : AppCompatActivity() {
         when (item.itemId) {
             R.id.change_folder -> pickFolder.launch(treeUri ?: DOWNLOADS)
             R.id.writing_practice -> startActivity(Intent(this, TrainingActivity::class.java))
+            R.id.back_up -> backup.backUp()
+            R.id.restore -> backup.restore()
             else -> return super.onOptionsItemSelected(item)
         }
         return true
