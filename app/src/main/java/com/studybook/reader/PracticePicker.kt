@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
@@ -43,11 +44,14 @@ object PracticePicker {
 
         val chips = ChipGroup(activity)
         val practise = MaterialButton(activity)
+        val quiz = MaterialButton(activity, null, com.google.android.material.R.attr.materialButtonOutlinedStyle)
         fun chosen() = (0 until chips.childCount).map { chips.getChildAt(it) as Chip }.filter { it.isChecked }.map { it.text.toString() }
         fun refresh() {
             val n = chosen().size
             practise.isEnabled = n > 0
             practise.text = activity.getString(R.string.practise_button, n)
+            quiz.isEnabled = n > 0
+            quiz.text = activity.getString(R.string.quiz_button, n)
         }
 
         if (characters.isEmpty()) {
@@ -83,9 +87,18 @@ object PracticePicker {
                 dialog.dismiss()
                 onPractise(chosen())
             }
+            quiz.setOnClickListener {
+                val (added, total) = QuizStash.add(activity, chosen())
+                Toast.makeText(activity,
+                    if (added == 0) activity.getString(R.string.quiz_already) else activity.getString(R.string.quiz_added, added, total),
+                    Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
             buttons.addView(all)
             buttons.addView(android.view.View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            buttons.addView(practise)
+            buttons.addView(quiz)
+            buttons.addView(practise, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { marginStart = (8 * dp).toInt() })
             root.addView(buttons)
             refresh()
         }

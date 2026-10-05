@@ -5,7 +5,8 @@ Rebuilds the app's character data from its original sources.
   app/src/main/assets/hanzi.bin           stroke data for every character in hanzi-writer-data, in one file
   app/src/main/assets/training/readings/  Jyutping + Pinyin for every character with a known reading,
                                           split into small files by Unicode block so only what is needed is loaded
-  app/src/main/assets/training/dict/      English → Chinese dictionary (entries in chunks + English word index by letter)
+  app/src/main/assets/training/dict/      English ↔ Chinese dictionary (entries in chunks + English word index by letter
+                                          + Chinese headword index by first character)
   app/src/main/assets/training/           hanzi-writer.min.js and the licences that must ship with the data
 
 Sources (downloaded into tools/.cache):
@@ -241,6 +242,15 @@ def build_dictionary():
     for letter, table in by_letter.items():
         with open(os.path.join(out_dir, f"i{letter}.json"), "w", encoding="utf-8") as out:
             json.dump(table, out, separators=(",", ":"))
+    # Chinese → English (meanings for the quiz): headword (traditional and simplified) → entry numbers, in files by the
+    # headword's first character, like the readings.
+    by_word = {}
+    for i, e in enumerate(entries):
+        for word in dict.fromkeys(e[:2]):
+            by_word.setdefault(ord(word[0]) >> SHARD_BITS, {}).setdefault(word, []).append(i)
+    for shard, table in by_word.items():
+        with open(os.path.join(out_dir, f"c{shard:x}.json"), "w", encoding="utf-8") as out:
+            json.dump(table, out, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     with open(os.path.join(out_dir, "meta.json"), "w") as out:
         json.dump({"chunk": DICT_CHUNK, "entries": len(entries)}, out)
     size = sum(os.path.getsize(os.path.join(out_dir, f)) for f in os.listdir(out_dir))

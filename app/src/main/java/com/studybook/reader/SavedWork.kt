@@ -50,6 +50,25 @@ class TrainingStore(private val dir: File) {
     }
 }
 
+/** Characters and words set aside for the quiz in writing practice: a JSON list in [TrainingStore], oldest first. */
+object QuizStash {
+    const val KEY = "quiz"
+
+    /** Adds the ones not there yet; returns how many were added and how many are in the quiz now. */
+    fun add(context: Context, items: List<String>): Pair<Int, Int> {
+        val store = TrainingStore(context)
+        val list = runCatching { JSONArray(store.get(KEY) ?: "[]") }.getOrDefault(JSONArray())
+        val have = (0 until list.length()).mapTo(HashSet()) { list.getString(it) }
+        var added = 0
+        for (item in items) if (have.add(item)) {
+            list.put(item)
+            added++
+        }
+        if (added > 0) store.set(KEY, list.toString())
+        return added to list.length()
+    }
+}
+
 /**
  * A backup of everything you've done in the app, as one JSON file you keep (e.g. in Download):
  * writing practice history, bookmarks and writing, and the tracing on chapter files.
@@ -57,7 +76,7 @@ class TrainingStore(private val dir: File) {
 object Backup {
     private const val FORMAT = "study-book-backup"
 
-    fun fileName() = "Study Book backup ${LocalDate.now()}.json"
+    fun fileName() = "Hok6 backup ${LocalDate.now()}.json"
 
     fun export(context: Context): String {
         val store = TrainingStore(context)
@@ -79,12 +98,12 @@ object Backup {
     class Summary(val words: Int, val tracedFiles: Int)
 
     /**
-     * Adds a backup to what's already here: history and bookmarks are merged, writing and tracing from the backup
-     * replace what's here for the same word or file. Throws if the file isn't a Study Book backup.
+     * Adds a backup to what's already here: history, bookmarks and the quiz are merged, writing and tracing from the backup
+     * replace what's here for the same word or file. Throws if the file isn't a Hok6 (or Study Book) backup.
      */
     fun restore(context: Context, text: String): Summary {
         val json = JSONObject(text)
-        require(json.optString("format") == FORMAT) { "not a Study Book backup" }
+        require(json.optString("format") == FORMAT) { "not a Hok6 backup" }
         val store = TrainingStore(context)
         val training = json.optJSONObject("training") ?: JSONObject()
         for (key in training.keys()) {
@@ -103,7 +122,7 @@ object Backup {
         return Summary(words, traced)
     }
 
-    /** One stored value after restoring: history and bookmarks combine both copies; anything else is the backup's. */
+    /** One stored value after restoring: history, bookmarks and the quiz combine both copies; anything else is the backup's. */
     fun merge(key: String, local: String?, incoming: Any): String {
         val here = local?.let { runCatching { JSONTokener(it).nextValue() }.getOrNull() }
         return when {
@@ -116,7 +135,7 @@ object Backup {
                 }
                 here.toString()
             }
-            key == "bookmarks" && here is JSONArray && incoming is JSONArray -> {
+            (key == "bookmarks" || key == QuizStash.KEY) && here is JSONArray && incoming is JSONArray -> {
                 val seen = HashSet<String>()
                 for (i in 0 until here.length()) seen += here.getString(i)
                 for (i in 0 until incoming.length()) if (seen.add(incoming.getString(i))) here.put(incoming.getString(i))

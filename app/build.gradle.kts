@@ -11,8 +11,8 @@ android {
         applicationId = "com.studybook.reader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.1"
+        versionCode = 4
+        versionName = "1.2"
 
     }
 
@@ -28,15 +28,15 @@ android {
     }
 
     buildTypes {
-        // "Study Book": the app you use.
+        // "Hok6": the app you use.
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("personal")
         }
-        // "Study Book (test)": installed alongside for automated checks, with its own data and book folder.
+        // "Hok6 (test)": installed alongside for automated checks, with its own data and book folder.
         debug {
             applicationIdSuffix = ".debug"
-            resValue("string", "app_name", "Study Book (test)")
+            resValue("string", "app_name", "Hok6 (test)")
         }
     }
 
@@ -85,6 +85,7 @@ dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("net.sf.kxml:kxml2:2.3.0")

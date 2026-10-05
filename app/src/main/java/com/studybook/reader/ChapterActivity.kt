@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.DocumentsContract
@@ -39,8 +40,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val KEY_DOCX_SIZE = "docx_text_size"
-private const val KEY_LIST_HIDDEN = "file_list_hidden"
-private const val TOOL_ICON = 0xFF424242.toInt()
 
 /** Where the last page read of a PDF is kept. */
 fun pageKey(uri: Uri) = "page:$uri"
@@ -58,21 +57,18 @@ class ChapterActivity : AppCompatActivity() {
     private lateinit var docId: String
     private lateinit var listPane: View
     private lateinit var contentPane: View
-    /** Phones (smallest side under 600 dp) show the file list and the open file one at a time, full screen. */
-    private val isPhone by lazy { resources.configuration.smallestScreenWidthDp < 600 }
-    /** On phones, Back closes the open file and returns to the file list. */
+    /** Back from an open file closes it and returns to the file list. */
     private val closeFileOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = closeFile()
     }
-    private lateinit var listDivider: View
     private lateinit var filesEmpty: View
     private lateinit var placeholder: View
     private lateinit var pdfFrame: View
     private lateinit var docxScroll: ScrollView
     private lateinit var docxText: InkTextView
-    private lateinit var zoomBar: View
-    private lateinit var inkTools: View
-    private lateinit var traceButton: ImageButton
+    private lateinit var toolbarTitle: TextView
+    /** The tracing and zoom tools in the title bar, shown while a file is open. */
+    private lateinit var fileTools: View
     private lateinit var practiseButton: TextView
     private lateinit var colorButtons: List<ImageButton>
     private lateinit var eraserButton: ImageButton
@@ -94,6 +90,10 @@ class ChapterActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chapter)
+        toolbarTitle = findViewById(R.id.toolbar_title)
+        setSupportActionBar(findViewById(R.id.toolbar))
+        // The title is a view of its own in the bar, so the tools get the room they need and a long name is shortened.
+        supportActionBar?.setDisplayShowTitleEnabled(false)
         treeUri = Uri.parse(intent.getStringExtra(EXTRA_TREE))
         chapterName = intent.getStringExtra(EXTRA_NAME).orEmpty()
         title = chapterName
@@ -101,19 +101,17 @@ class ChapterActivity : AppCompatActivity() {
 
         listPane = findViewById(R.id.list_pane)
         contentPane = findViewById(R.id.content_pane)
-        listDivider = findViewById(R.id.list_divider)
         filesEmpty = findViewById(R.id.files_empty)
         placeholder = findViewById(R.id.placeholder)
         pdfFrame = findViewById(R.id.pdf_frame)
         docxScroll = findViewById(R.id.docx_scroll)
         docxText = findViewById(R.id.docx_text)
-        zoomBar = findViewById(R.id.zoom_bar)
-        inkTools = findViewById(R.id.ink_tools)
-        traceButton = findViewById(R.id.trace)
+        fileTools = findViewById(R.id.file_tools)
         practiseButton = findViewById(R.id.practise_mode)
         eraserButton = findViewById(R.id.ink_eraser)
         colorButtons = listOf(R.id.ink_red, R.id.ink_blue, R.id.ink_black).map { findViewById(it) }
-        ink = Ink(this)
+        // Files open ready to write on; Practice mode switches tapping to choosing characters instead.
+        ink = Ink(this).apply { active = true }
         docxText.surface = InkSurface(docxText, ink) { dy -> docxScroll.scrollBy(0, dy.toInt()) }
         docxText.customSelectionActionModeCallback = PractiseSelection()
         docxText.ink = ink
@@ -131,13 +129,8 @@ class ChapterActivity : AppCompatActivity() {
         findViewById<View>(R.id.zoom_in).setOnClickListener { zoom(1) }
         findViewById<View>(R.id.zoom_out).setOnClickListener { zoom(-1) }
         setupInkTools()
-        if (isPhone) {
-            listPane.layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-            showPhoneList(true)
-            onBackPressedDispatcher.addCallback(this, closeFileOnBack)
-        } else {
-            setListVisible(!prefs.getBoolean(KEY_LIST_HIDDEN, false))
-        }
+        showList(true)
+        onBackPressedDispatcher.addCallback(this, closeFileOnBack)
 
         docId = intent.getStringExtra(EXTRA_DOC_ID)!!
         loadFiles()
@@ -178,7 +171,6 @@ class ChapterActivity : AppCompatActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.open_external).isVisible = current != null
-        menu.findItem(R.id.toggle_list).isVisible = !isPhone
         menu.findItem(R.id.move_files).isVisible = files.isNotEmpty()
         menu.findItem(R.id.save_traced).isVisible = current?.kind == Kind.PDF
         return super.onPrepareOptionsMenu(menu)
@@ -187,11 +179,6 @@ class ChapterActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             android.R.id.home -> onBackPressedDispatcher.onBackPressed()
-            R.id.toggle_list -> {
-                val visible = !listPane.isVisible
-                setListVisible(visible)
-                prefs.edit().putBoolean(KEY_LIST_HIDDEN, !visible).apply()
-            }
             R.id.open_external -> current?.let { openExternal(it) }
             R.id.move_files -> startSelection(null)
             R.id.save_traced -> saveTraced()
@@ -206,24 +193,18 @@ class ChapterActivity : AppCompatActivity() {
         return true
     }
 
-    private fun setListVisible(visible: Boolean) {
+    /** Either the file list or the open file fills the screen. */
+    private fun showList(visible: Boolean) {
         listPane.isVisible = visible
-        listDivider.isVisible = visible
+        contentPane.isVisible = !visible
+        closeFileOnBack.isEnabled = !visible
+        title = if (visible) chapterName else current?.name ?: chapterName
     }
 
-    /** Phone layout: either the file list or the open file fills the screen. */
-    private fun showPhoneList(showList: Boolean) {
-        listPane.isVisible = showList
-        listDivider.isVisible = false
-        contentPane.isVisible = !showList
-        closeFileOnBack.isEnabled = !showList
-        title = if (showList) chapterName else current?.name ?: chapterName
-    }
-
-    /** Phone Back from an open file: save, close it, and return to the list. */
+    /** Back from an open file: save, close it, and return to the list. */
     private fun closeFile() {
         clearOpenFile()
-        showPhoneList(true)
+        showList(true)
     }
 
     /** Saves and closes the open file, leaving the "choose a file" message. */
@@ -236,7 +217,7 @@ class ChapterActivity : AppCompatActivity() {
         ink.document = null
         adapter.selected = null
         for (v in listOf(placeholder, pdfFrame, docxScroll)) v.isVisible = v === placeholder
-        zoomBar.isVisible = false
+        fileTools.isVisible = false
         invalidateOptionsMenu()
     }
 
@@ -340,7 +321,7 @@ class ChapterActivity : AppCompatActivity() {
         // Save the open file's tracing and page first, so they move with it.
         if (current != null && chosen.any { it.uri == current?.uri }) {
             clearOpenFile()
-            if (isPhone) showPhoneList(true)
+            showList(true)
         }
         Toast.makeText(this, R.string.moving, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
@@ -421,7 +402,7 @@ class ChapterActivity : AppCompatActivity() {
         val replacingOpenFile = replace?.uri == entry.uri
         if (replacingOpenFile) {
             clearOpenFile()
-            if (isPhone) showPhoneList(true)
+            showList(true)
         }
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -460,8 +441,12 @@ class ChapterActivity : AppCompatActivity() {
         current = entry
         adapter.selected = entry.uri
         for (v in listOf(placeholder, pdfFrame, docxScroll)) v.isVisible = v === view
-        zoomBar.isVisible = view !== placeholder
-        if (isPhone) showPhoneList(false)
+        fileTools.isVisible = view !== placeholder
+        showList(false)
+        if (!writeHintShown) {
+            writeHintShown = true
+            Toast.makeText(this, R.string.write_hint, Toast.LENGTH_SHORT).show()
+        }
         invalidateOptionsMenu()
     }
 
@@ -491,44 +476,37 @@ class ChapterActivity : AppCompatActivity() {
         ink.document = null
         adapter.selected = null
         for (v in listOf(placeholder, pdfFrame, docxScroll)) v.isVisible = v === placeholder
-        zoomBar.isVisible = false
-        if (isPhone) showPhoneList(true)
+        fileTools.isVisible = false
+        showList(true)
         invalidateOptionsMenu()
     }
 
     private fun setupInkTools() {
-        // Trace and Practise are separate modes; at most one is on, and the active one is drawn solid.
-        traceButton.setOnClickListener {
-            ink.active = !ink.active
-            if (ink.active) {
-                ink.practising = false
-                Toast.makeText(this, R.string.trace_on_hint, Toast.LENGTH_SHORT).show()
-            }
-            updateInkTools()
-        }
+        // Writing is always on, except in Practice mode, where a tap chooses a character to practice.
         practiseButton.setOnClickListener {
             ink.practising = !ink.practising
-            if (ink.practising) {
-                ink.active = false
-                Toast.makeText(this, R.string.practise_on_hint, Toast.LENGTH_SHORT).show()
-            }
+            ink.active = !ink.practising
+            if (ink.practising) Toast.makeText(this, R.string.practise_on_hint, Toast.LENGTH_SHORT).show()
             updateInkTools()
         }
         colorButtons.forEachIndexed { i, button ->
             button.setOnClickListener {
                 ink.color = Ink.PEN_COLORS[i]
                 ink.tool = InkTool.PEN
+                leavePractice()
                 updateInkTools()
             }
         }
         eraserButton.setOnClickListener {
             ink.tool = if (ink.tool == InkTool.ERASER) InkTool.PEN else InkTool.ERASER
+            leavePractice()
             updateInkTools()
         }
         findViewById<View>(R.id.ink_size).setOnClickListener {
             val sizes = Ink.PEN_SIZES
             ink.widthDp = sizes[(sizes.indexOfFirst { it == ink.widthDp } + 1) % sizes.size]
             ink.tool = InkTool.PEN
+            leavePractice()
             updateInkTools()
         }
         findViewById<View>(R.id.ink_undo).setOnClickListener {
@@ -549,21 +527,43 @@ class ChapterActivity : AppCompatActivity() {
         updateInkTools()
     }
 
+    /** Picking a pen, size or the eraser means writing again. */
+    private fun leavePractice() {
+        ink.practising = false
+        ink.active = true
+    }
+
     private fun updateInkTools() {
-        inkTools.isVisible = ink.active
-        traceButton.setBackgroundResource(if (ink.active) R.drawable.tool_active else 0)
-        traceButton.imageTintList = android.content.res.ColorStateList.valueOf(if (ink.active) Color.WHITE else TOOL_ICON)
-        practiseButton.setBackgroundResource(if (ink.practising) R.drawable.tool_active else 0)
-        practiseButton.setTextColor(if (ink.practising) Color.WHITE else TOOL_ICON)
+        // The mode that's on is shown solid; pens and the eraser are ringed when chosen (and not in Practice mode).
+        practiseButton.setBackgroundResource(if (ink.practising) R.drawable.bar_active else 0)
+        if (ink.practising) practiseButton.setTextColor(ContextCompat.getColor(this, R.color.brand))
+        else practiseButton.setTextColor(barTextColors)
+        val writing = !ink.practising
         colorButtons.forEachIndexed { i, button ->
-            val selected = ink.tool == InkTool.PEN && ink.color == Ink.PEN_COLORS[i]
-            button.setBackgroundResource(if (selected) R.drawable.tool_selected else 0)
-            // Dot size shows the pen size.
-            val pad = ((17 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
+            val selected = writing && ink.tool == InkTool.PEN && ink.color == Ink.PEN_COLORS[i]
+            button.setBackgroundResource(if (selected) R.drawable.bar_selected else 0)
+            // A white ring keeps the red dot visible on the red bar; the dot's size shows the pen size.
+            button.imageTintList = null // the bar's icon colour would turn every dot white
+            button.setImageDrawable(GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Ink.PEN_COLORS[i] or 0xFF000000.toInt())
+                setStroke((2 * ink.density).toInt(), Color.WHITE)
+            })
+            val pad = ((15 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
             button.scaleType = ImageView.ScaleType.FIT_CENTER
             button.setPadding(pad, pad, pad, pad)
         }
-        eraserButton.setBackgroundResource(if (ink.tool == InkTool.ERASER) R.drawable.tool_selected else 0)
+        eraserButton.setBackgroundResource(if (writing && ink.tool == InkTool.ERASER) R.drawable.bar_selected else 0)
+    }
+
+    /** The title bar's text colour (from the layout), for the Practice button when it's off. */
+    private val barTextColors by lazy { practiseButton.textColors }
+    /** The tip about writing and scrolling is shown on the first file opened. */
+    private var writeHintShown = false
+
+    override fun onTitleChanged(title: CharSequence?, color: Int) {
+        super.onTitleChanged(title, color)
+        if (::toolbarTitle.isInitialized) toolbarTitle.text = title
     }
 
     private fun invalidateInk() {

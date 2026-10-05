@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "StudyBook"
+rootProject.name = "Hok6"
 include(":app")

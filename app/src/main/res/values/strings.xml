@@ -1,5 +1,6 @@
 <resources>
-    <string name="app_name">Study Book</string>
+    <string name="app_name">Hok6</string>
+    <string name="tagline">Where you learn, study, and imitate.</string>
     <string name="choose_folder">Choose book folder</string>
     <string name="change_folder">Change book folder</string>
     <string name="no_folder">Pick the folder that holds your book. Each sub-folder inside it is shown as a chapter.</string>
@@ -8,7 +9,6 @@
     <string name="loose_files">Files in book folder</string>
     <string name="pick_file">Choose a file from the list</string>
     <string name="empty_chapter">No files in this chapter</string>
-    <string name="toggle_list">Show/hide file list</string>
     <string name="open_external">Open in another app</string>
     <string name="open_with">Open with</string>
     <string name="no_app">No app installed can open this file</string>
@@ -22,7 +22,6 @@
     <string name="repeat_one">Repeat this track</string>
     <string name="speed">Playback speed</string>
     <string name="close_player">Stop and close player</string>
-    <string name="trace">Trace (draw on the page)</string>
     <string name="pen_red">Red pen</string>
     <string name="pen_blue">Blue pen</string>
     <string name="pen_black">Black pen</string>
@@ -33,19 +32,19 @@
     <string name="clear">Clear</string>
     <string name="cleared">Tracing cleared</string>
     <string name="nothing_to_clear">Nothing to clear on screen</string>
-    <string name="trace_on_hint">Trace mode: draw with one finger or a stylus, scroll with two fingers</string>
+    <string name="write_hint">Write with a finger or stylus. Scroll and zoom with two fingers.</string>
     <string name="writing_practice">Writing practice</string>
     <string name="tts_missing">No %1$s voice is installed. Add one in Settings → Text-to-speech (Google Speech Services → Install voice data).</string>
-    <string name="practise_title">Practise writing</string>
-    <string name="practise_hint">Tap the characters you want to practise.</string>
+    <string name="practise_title">Practice writing</string>
+    <string name="practise_hint">Tap the characters you want to practice.</string>
     <string name="practise_none">No Chinese characters were found on this page.</string>
-    <string name="practise_hint_recognised">This page is an image, so the characters were recognised from it — check they\'re right. Tap the ones you want to practise.</string>
+    <string name="practise_hint_recognised">This page is an image, so the characters were recognised from it — check they\'re right. Tap the ones you want to practice.</string>
     <string name="recognising">Reading the characters on this page…</string>
-    <string name="practise_button">Practise (%1$d)</string>
+    <string name="practise_button">Practice (%1$d)</string>
     <string name="select_all">Select all</string>
     <string name="practise_no_chinese">The selection has no Chinese characters</string>
-    <string name="practise_mode">Practise mode (tap a character to practise writing it)</string>
-    <string name="practise_on_hint">Practise mode: tap a character to practise writing it</string>
+    <string name="practise_mode">Practice mode (tap a character to practice writing it)</string>
+    <string name="practise_on_hint">Practice mode: tap a character to practice writing it</string>
     <string name="practise_miss">Tap right on a Chinese character</string>
     <string name="share_worksheet">Share worksheet</string>
     <string name="share_failed">Couldn\'t make the PDF</string>
@@ -54,7 +53,7 @@
     <string name="backup_saved">Backup saved. Keep it somewhere safe (e.g. Google Drive) to restore after reinstalling.</string>
     <string name="backup_failed">Couldn\'t save the backup</string>
     <string name="backup_restored">Restored: %1$d words in history, tracing on %2$d files</string>
-    <string name="backup_not_valid">That file isn\'t a Study Book backup</string>
+    <string name="backup_not_valid">That file isn\'t a Hok6 backup</string>
     <string name="new_chapter_folder">New chapter folder…</string>
     <string name="new_folder_title">New chapter folder</string>
     <string name="new_folder_item">＋ New folder…</string>
@@ -78,7 +77,7 @@
     </plurals>
     <string name="move_skipped">Not moved, because %1$s already has a file with the same name:\n%2$s</string>
     <string name="move_failed">Couldn\'t move:\n%1$s\n(%2$s)</string>
-    <string name="need_write">To move files and make folders, Study Book needs permission to change your book folder.\n\nTap Choose folder, pick the same book folder again, then tap Allow.</string>
+    <string name="need_write">To move files and make folders, Hok6 needs permission to change your book folder.\n\nTap Choose folder, pick the same book folder again, then tap Allow.</string>
     <string name="choose_again">Choose folder</string>
     <string name="wrong_folder">That\'s a different folder. Choose your book folder to allow changes.</string>
     <string name="save_traced">Save a copy with my tracing…</string>
@@ -94,4 +93,8 @@
     <string name="other_name">Use another name</string>
     <string name="saved_as">Saved %1$s</string>
     <string name="save_failed">Couldn\'t save: %1$s</string>
+    <string name="practice">Practice</string>
+    <string name="quiz_button">Add to quiz (%1$d)</string>
+    <string name="quiz_added">Added %1$d to the quiz (%2$d in it now). Open Writing practice → Quiz.</string>
+    <string name="quiz_already">Already in the quiz</string>
 </resources>

@@ -26,10 +26,11 @@
   <main class="home-main">
     <form id="newForm" class="card">
       <h2>New worksheet</h2>
-      <label class="field">Characters, words or English to practise
+      <label class="field">Characters, words or English to practice
         <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 — or type English: thank you, good morning"></textarea>
         <small>One page per word (separate words with spaces): stroke order, a row to trace, then rows to write it. English is looked up in the English → Chinese box.</small>
       </label>
+      <button type="button" id="handBtn" hidden>✍ Write by hand (stylus)</button>
 
       <fieldset class="field">
         <legend>Box size</legend>
@@ -50,6 +51,39 @@
       <p id="formError" class="error" hidden></p>
     </form>
 
+    <section class="card" id="quizCard">
+      <div class="card-head">
+        <h2>Quiz</h2>
+        <button id="quizClear" class="plain small" hidden>Remove all</button>
+      </div>
+      <p id="quizEmpty" class="muted">Nothing to quiz yet. On a homework page, tap <b>Practice</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>.</p>
+      <div id="quizItems" class="quiz-items"></div>
+      <div id="quizStart" class="quiz-start" hidden>
+        <fieldset class="field">
+          <legend>Flash cards</legend>
+          <label class="check"><input type="radio" name="fcDir" value="zh" checked> Chinese → meaning</label>
+          <label class="check"><input type="radio" name="fcDir" value="en"> English → Chinese</label>
+          <label class="check"><input type="radio" name="fcDir" value="sound"> Sound → Chinese</label>
+          <button type="button" class="primary" id="fcStart">Start flash cards</button>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Written quiz</legend>
+          <label class="check"><input type="radio" name="wqPrompt" value="en" checked> English meaning</label>
+          <label class="check"><input type="radio" name="wqPrompt" value="zh"> Chinese character
+            <select id="wqTimer" aria-label="Hide the character after">
+              <option value="0">stays showing</option>
+              <option value="3">hidden after 3 s</option>
+              <option value="5">hidden after 5 s</option>
+              <option value="10">hidden after 10 s</option>
+              <option value="20">hidden after 20 s</option>
+            </select>
+          </label>
+          <label class="check"><input type="radio" name="wqPrompt" value="sound"> Pronunciation</label>
+          <button type="button" class="primary" id="wqStart">Start written quiz</button>
+        </fieldset>
+      </div>
+    </section>
+
     <section class="card" id="translateBox">
       <div class="card-head">
         <h2>English → <span id="trLang">廣東話 Cantonese</span></h2>
@@ -61,7 +95,7 @@
     <section class="card">
       <div class="card-head">
         <h2>History &amp; bookmarks</h2>
-        <button id="bmPractise" class="primary small" hidden>Practise all ★</button>
+        <button id="bmPractise" class="primary small" hidden>Practice all ★</button>
         <button id="histClear" class="plain small">Clear history</button>
       </div>
       <div class="filters">
@@ -71,7 +105,7 @@
         <button data-filter="bookmarks">★ Bookmarks</button>
       </div>
       <ul id="histList" class="items"></ul>
-      <p id="histEmpty" class="muted">Words and characters you practise appear here. Tap one to practise it again; tap ☆ to bookmark it.</p>
+      <p id="histEmpty" class="muted">Words and characters you practice appear here. Tap one to practice it again; tap ☆ to bookmark it.</p>
       <div id="backupRow" class="backup-row" hidden>
         <span class="muted">Your history, bookmarks, writing and tracing, saved to a file:</span>
         <button id="backUpBtn" class="small">Back up…</button>
@@ -81,13 +115,15 @@
 
 
     <section class="card credits">
-      <h2>About</h2>
+      <h2>About Hok6</h2>
+      <p><b>Hok6</b> (學, hok6) — where you learn, study, and imitate.</p>
       <p>Stroke order animations and quizzes by <b>Hanzi Writer</b> (github.com/chanind/hanzi-writer, MIT).
         Character data from <b>hanzi-writer-data</b> / <b>Make Me a Hanzi</b> (github.com/skishore/makemeahanzi),
         derived from Arphic fonts, Arphic Public License.
         Worksheet layout modelled on <b>chinese-character-worksheets</b> (github.com/12jr/chinese-character-worksheets).
         Jyutping from <b>rime-cantonese</b> (github.com/rime/rime-cantonese, CC BY 4.0).
         Pinyin from the Unicode <b>Unihan</b> database.
+        Handwriting recognition by Google <b>ML Kit Digital Ink Recognition</b> (ML Kit Terms).
         English → Chinese from <b>CC-CEDICT</b> (mdbg.net, CC BY-SA 4.0) and <b>CC-Canto</b> (cantonese.org, CC BY-SA 3.0).</p>
       <p class="muted">Characters marked ≈ are not in the stroke data; their stroke order is assembled from their parts and may differ slightly from the standard.</p>
     </section>
@@ -121,11 +157,11 @@
     </div>
     <button class="primary" id="printBtn">Export</button>
   </header>
-  <div id="hint" class="hint">Tap a stroke-order square to watch and practise that character. Tap the word at the top to hear it.</div>
+  <div id="hint" class="hint">Tap a stroke-order square to watch and practice that character. Tap the word at the top to hear it.</div>
   <!-- One word at a time on screen; Export / Print include every word's page -->
   <div id="wordBar" class="word-bar">
     <button class="icon nav" id="wordPrev" aria-label="Previous word">‹</button>
-    <select id="wordSelect" aria-label="Word to practise"></select>
+    <select id="wordSelect" aria-label="Word to practice"></select>
     <button class="icon nav" id="wordNext" aria-label="Next word">›</button>
     <button class="icon" id="wordSay" aria-label="Say the word">🔊</button>
     <button class="icon" id="wordSlow" aria-label="Say the word slowly">🐢</button>
@@ -136,8 +172,33 @@
   <!-- Phone: one character at a time, big squares to write in -->
   <div id="rowView">
     <div id="rowCells" class="row-cells"></div>
-    <p class="muted row-tip">Tap a stroke-order square to practise that character. Write in the others.</p>
+    <p class="muted row-tip">Tap a stroke-order square to practice that character. Write in the others.</p>
   </div>
+</section>
+
+<!-- Quiz: flash cards, or writing from a prompt -->
+<section id="quizView" class="view" hidden>
+  <header class="bar">
+    <button class="icon" id="qBack" aria-label="Back">←</button>
+    <h1 id="qTitle">Quiz</h1>
+    <div class="spacer"></div>
+    <span id="qProgress" class="q-progress"></span>
+  </header>
+  <main class="quiz-main">
+    <div class="q-side">
+      <div id="qPrompt" class="q-prompt"></div>
+      <div id="qAnswer" class="q-answer" hidden></div>
+      <p id="qStatus" class="status"></p>
+      <div id="qButtons" class="q-buttons"></div>
+    </div>
+    <div id="qWriteArea" class="q-write" hidden>
+      <div class="writer-wrap" id="qWrap">
+        <svg id="qGrid" class="writer-grid" viewBox="0 0 100 100" aria-hidden="true"></svg>
+        <div id="qWriter"></div>
+      </div>
+    </div>
+    <div id="qSummary" class="q-summary" hidden></div>
+  </main>
 </section>
 
 <!-- Hanzi Writer practice for one character -->
@@ -177,6 +238,37 @@
       <button id="pOutline">Outline</button>
     </div>
     <div id="pStrip" class="strip"></div>
+  </div>
+</div>
+
+<!-- Handwriting pad: write characters with a stylus; the chosen one goes into the New worksheet box -->
+<div id="handPad" class="modal" hidden>
+  <div class="modal-card hand-card">
+    <div class="hand-head">
+      <h2>Write by hand</h2>
+      <div class="spacer"></div>
+      <button class="icon" id="hClose" aria-label="Close">✕</button>
+    </div>
+    <div class="hand-wrap">
+      <svg class="writer-grid" viewBox="0 0 100 100" aria-hidden="true">
+        <g stroke="#D8D8D8" stroke-width="0.5" stroke-dasharray="2 2">
+          <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/>
+          <line x1="50" y1="0" x2="50" y2="100"/><line x1="0" y1="50" x2="100" y2="50"/>
+        </g>
+      </svg>
+      <canvas id="hCanvas"></canvas>
+    </div>
+    <div class="hand-side">
+      <p id="hStatus" class="status">Write a character in the square, then tap the right one below.</p>
+      <div id="hCands" class="hand-cands"></div>
+      <div class="hand-buttons">
+        <button id="hClear">Clear</button>
+        <button id="hSpace">Space (next word)</button>
+        <button id="hDel" aria-label="Delete the last character">⌫</button>
+        <button id="hDone" class="primary">Done</button>
+      </div>
+      <p class="hand-box"><span class="muted">In the box:</span> <span id="hText"></span></p>
+    </div>
   </div>
 </div>
 

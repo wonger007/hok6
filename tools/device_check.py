@@ -3,17 +3,17 @@
 End-to-end check on a real Android device, with no taps needed from you. When no device is connected and ready,
 it starts an emulator instead (and shuts it down afterwards).
 
-It installs "Study Book (test)" (the debug build, a separate app from your own "Study Book", with its own data),
+It installs "Hok6 (test)" (the debug build, a separate app from your own "Hok6", with its own data),
 copies the book in test/ to Download/StudyBookCheck on the device, and then checks:
 
   1. the chapters are listed in natural order (Chapter_2 before Chapter_10)
   2. a chapter lists all its files
   3. a PDF opens and shows its pages
-  4. Practise writing lists the characters on the page and opens writing practice for one
+  4. Practice writing lists the characters on the page and opens writing practice for one
   5. the practice panel shows that character's stroke order (from the bundled stroke data)
   6. Export → Print / Save as PDF produces a US Letter PDF
   7. Export → Share PDF opens Android's share menu with a US Letter PDF drawn as lines and text (not a picture)
-  8. writing on a worksheet is kept in app storage when the word is practised again; Clear erases it and Undo restores it
+  8. writing on a worksheet is kept in app storage when the word is practiced again; Clear erases it and Undo restores it
   9. typing English ("thank you") suggests Chinese words
 
 Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
@@ -459,13 +459,13 @@ def main():
 
     def practise_from_pdf():
         device.tap(r"writing practice")
-        device.wait_for(r"practise writing")
+        device.wait_for(r"practice writing")
         chips = [n for n in device.nodes() if len(n[0]) == 1 and re.match(r"[㐀-鿿\U00020000-\U0003ffff]", n[0])]
         if not chips:
             raise Failed("no Chinese characters listed for the page")
         chip = next((c for c in chips if c[0] not in "姓名日期"), chips[0])
         device.shell(f"input tap {chip[2]} {chip[3]}")
-        device.tap(r"practise \(1\)")
+        device.tap(r"practice \(1\)")
         end = time.time() + 90
         while "TrainingActivity" not in device.focused():
             if time.time() > end:
@@ -568,7 +568,7 @@ def main():
         return f"share menu opened with {files[0]} ({len(data) // 1024} KB, US Letter, lines and text)"
 
     def writing_kept_and_cleared():
-        # Write a stroke on the word shown, practise the same word again, then Clear and Undo.
+        # Write a stroke on the word shown, practice the same word again, then Clear and Undo.
         value = devtools_eval(device, "(async()=>{ const p=state.row, ws=state.ws;"
                                       " (state.ink[p]=state.ink[p]||[]).push({c:'#212121',w:0.8,p:[40,60,60,80,80,70]});"
                                       " redrawInk(p); saveInkSoon(p); saveInk();"
@@ -601,7 +601,7 @@ def main():
     ok = (check("Chapters are listed in order", results, device, chapters_in_order)
           and check("A chapter lists its files", results, device, chapter_lists_files)
           and check("A PDF opens", results, device, pdf_opens)
-          and check("Practise writing from the PDF", results, device, practise_from_pdf)
+          and check("Practice writing from the PDF", results, device, practise_from_pdf)
           and check("Stroke order is shown", results, device, stroke_order_shown)
           and check("Worksheet saves as a PDF", results, device, save_pdf)
           and check("Worksheet shares as a PDF", results, device, share_pdf)

@@ -769,7 +769,7 @@ async function renderLists() {
   $('histEmpty').hidden = items.length > 0;
   $('histEmpty').textContent = filter === 'bookmarks'
     ? 'No bookmarks yet. Tap ☆ on a character or word to bookmark it.'
-    : 'Words and characters you practise appear here. Tap one to practise it again; tap ☆ to bookmark it.';
+    : 'Words and characters you practice appear here. Tap one to practice it again; tap ☆ to bookmark it.';
   $('bmPractise').hidden = filter !== 'bookmarks' || bm.length === 0;
   $('histClear').hidden = filter === 'bookmarks';
   document.querySelectorAll('.filters button').forEach((b) => b.classList.toggle('sel', b.dataset.filter === filter));
@@ -837,8 +837,8 @@ function wordOf(ch) {
   return words.find((w) => Array.from(w).length > 1 && w.includes(ch)) || null;
 }
 
-function drawWriterGrid(size) {
-  const g = $('pGrid');
+/* The 米 guide and border behind a Hanzi Writer box (the practice panel's, or the quiz's). */
+function drawWriterGrid(size, g = $('pGrid')) {
   g.innerHTML = '';
   const a = { stroke: '#E0B4B4', 'stroke-width': 0.4, 'stroke-dasharray': '2 1.5' };
   line(g, 50, 0, 50, 100, a);
@@ -846,7 +846,7 @@ function drawWriterGrid(size) {
   line(g, 0, 0, 100, 100, a);
   line(g, 0, 100, 100, 0, a);
   el('rect', { x: 0.5, y: 0.5, width: 99, height: 99, fill: 'none', stroke: BRAND, 'stroke-width': 0.8 }, g);
-  const wrap = document.querySelector('.writer-wrap');
+  const wrap = g.parentNode;
   wrap.style.width = size + 'px';
   wrap.style.height = size + 'px';
 }
@@ -1250,6 +1250,511 @@ function renderTranslations() {
   }, 300);
 }
 
+// ---------------------------------------------------------------- quiz: stash, flash cards, written quiz
+
+/* Characters and words set aside for the quiz (added from homework pages by the app, key 'quiz'). Flash cards and the
+   written quiz are separate quizzes; each goes through the whole stash in random order, and a missed one comes back
+   once at the end of the round. */
+const quiz = { mode: '', opt: '', timer: 0, deck: [], i: 0, results: new Map(), writer: null, run: 0, hideTimer: 0 };
+
+function quizItems() {
+  return store.get('quiz', []);
+}
+
+function renderQuizCard() {
+  const items = quizItems();
+  const out = $('quizItems');
+  out.textContent = '';
+  for (const t of items) {
+    const chip = document.createElement('span');
+    chip.className = 'quiz-item';
+    chip.innerHTML = '<span class="q-word"></span><button aria-label="Say it">🔊</button><button aria-label="Remove from the quiz">✕</button>';
+    chip.querySelector('.q-word').textContent = t;
+    const [say, remove] = chip.querySelectorAll('button');
+    say.onclick = () => speak(t);
+    remove.onclick = () => { store.set('quiz', quizItems().filter((x) => x !== t)); renderQuizCard(); };
+    out.appendChild(chip);
+  }
+  $('quizEmpty').hidden = items.length > 0;
+  $('quizStart').hidden = items.length === 0;
+  $('quizClear').hidden = items.length === 0;
+}
+
+function setupQuiz() {
+  const opts = store.get('quizOpts', {});
+  const pick = (name, value) => document.querySelectorAll(`input[name=${name}]`).forEach((r) => { r.checked = r.value === value; });
+  if (opts.fcDir) pick('fcDir', opts.fcDir);
+  if (opts.wqPrompt) pick('wqPrompt', opts.wqPrompt);
+  if (opts.wqTimer != null) $('wqTimer').value = String(opts.wqTimer);
+  const chosen = (name) => document.querySelector(`input[name=${name}]:checked`).value;
+  const saveOpts = () => store.set('quizOpts', { fcDir: chosen('fcDir'), wqPrompt: chosen('wqPrompt'), wqTimer: Number($('wqTimer').value) });
+  // Choosing a timer means the Chinese character prompt.
+  $('wqTimer').addEventListener('change', () => pick('wqPrompt', 'zh'));
+  $('fcStart').onclick = () => { saveOpts(); startQuiz('cards', chosen('fcDir'), 0, quizItems()); };
+  $('wqStart').onclick = () => { saveOpts(); startQuiz('write', chosen('wqPrompt'), Number($('wqTimer').value), quizItems()); };
+  $('quizClear').onclick = () => {
+    if (!confirm('Remove everything from the quiz?')) return;
+    store.set('quiz', []);
+    renderQuizCard();
+  };
+  $('qBack').onclick = closeQuiz;
+  renderQuizCard();
+}
+
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+function startQuiz(mode, opt, timer, items) {
+  if (!items.length) return;
+  Object.assign(quiz, { mode, opt, timer, deck: shuffle(items.slice()), i: 0, results: new Map() });
+  $('qTitle').textContent = mode === 'cards' ? 'Flash cards' : 'Written quiz';
+  $('home').hidden = true;
+  $('quizView').hidden = false;
+  showQuizItem();
+}
+
+function closeQuiz() {
+  stopQuizItem();
+  $('quizView').hidden = true;
+  $('home').hidden = false;
+  renderQuizCard();
+  renderLists();
+}
+
+function stopQuizItem() {
+  quiz.run++;
+  clearInterval(quiz.hideTimer);
+  if (quiz.writer) quiz.writer.cancelQuiz();
+  quiz.writer = null;
+}
+
+function quizButtons(list) {
+  const out = $('qButtons');
+  out.textContent = '';
+  for (const [label, onClick, cls] of list) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.onclick = onClick;
+    out.appendChild(b);
+  }
+}
+
+function bigText(textIn, cls = 'q-big') {
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = textIn;
+  return d;
+}
+
+function soundButtons(item, auto) {
+  const row = document.createElement('div');
+  row.className = 'q-buttons';
+  const play = document.createElement('button');
+  play.className = 'q-sound';
+  play.textContent = '🔊';
+  play.setAttribute('aria-label', 'Play the sound');
+  play.onclick = () => speak(item);
+  const slow = document.createElement('button');
+  slow.className = 'q-sound';
+  slow.textContent = '🐢';
+  slow.setAttribute('aria-label', 'Play it slowly');
+  slow.onclick = () => speak(item, SLOW);
+  row.append(play, slow);
+  if (auto) setTimeout(() => speak(item), 300);
+  return row;
+}
+
+/* The answer side of a card: the word, how it's said, and what it means, leaving out what the prompt already showed. */
+async function answerFor(item, prompt) {
+  const table = await loadReadings(item);
+  const box = document.createElement('div');
+  if (prompt !== 'zh') box.append(bigText(item));
+  box.append(bigText(romanOfText(item, table), 'q-roman'));
+  if (prompt !== 'en') box.append(bigText(await meaningOf(item) || '(no English meaning found)', 'q-meaning'));
+  return box;
+}
+
+async function showQuizItem() {
+  stopQuizItem();
+  const run = quiz.run;
+  if (quiz.i >= quiz.deck.length) return showQuizSummary();
+  const item = quiz.deck[quiz.i];
+  $('qProgress').textContent = `${quiz.i + 1} / ${quiz.deck.length}`;
+  $('qSummary').hidden = true;
+  document.querySelector('.q-side').hidden = false;
+  $('qAnswer').hidden = true;
+  $('qStatus').textContent = '';
+  const prompt = $('qPrompt');
+  prompt.textContent = '';
+  prompt.hidden = false;
+  $('qButtons').hidden = false;
+  if (quiz.mode === 'cards') {
+    $('qWriteArea').hidden = true;
+    if (quiz.opt === 'zh') prompt.append(bigText(item));
+    else if (quiz.opt === 'en') prompt.append(bigText(await meaningOf(item) || '(no English meaning found)', 'q-meaning'));
+    else prompt.append(soundButtons(item, true));
+    if (run !== quiz.run) return;
+    quizButtons([['Show answer', () => revealCard(item)]]);
+  } else {
+    await startWriting(item, run);
+  }
+}
+
+async function revealCard(item) {
+  const run = quiz.run;
+  const answer = await answerFor(item, quiz.opt);
+  if (run !== quiz.run) return;
+  $('qAnswer').textContent = '';
+  $('qAnswer').append(answer);
+  $('qAnswer').hidden = false;
+  if (quiz.opt !== 'sound') speak(item);
+  quizButtons([
+    ['✗ Again', () => nextQuizItem(item, false), 'q-no'],
+    ['✓ Knew it', () => nextQuizItem(item, true), 'q-yes'],
+  ]);
+}
+
+/* Records the first answer for each item; a missed one comes back once, at the end of the round. */
+function nextQuizItem(item, ok, detail) {
+  if (!quiz.results.has(item)) {
+    quiz.results.set(item, { ok, detail });
+    if (!ok) quiz.deck.push(item);
+  }
+  quiz.i++;
+  showQuizItem();
+}
+
+async function startWriting(item, run) {
+  const prompt = $('qPrompt');
+  const chars = Array.from(item).filter(isHan);
+  const count = chars.length > 1 ? ` (${chars.length} characters)` : '';
+  if (quiz.opt === 'en') {
+    prompt.append(bigText(await meaningOf(item) || '(no English meaning found)', 'q-meaning'));
+    $('qStatus').textContent = 'Write it in Chinese' + count;
+  } else if (quiz.opt === 'sound') {
+    const table = await loadReadings(item);
+    prompt.append(soundButtons(item, true), bigText(romanOfText(item, table), 'q-roman'));
+    $('qStatus').textContent = 'Write what you hear' + count;
+  } else {
+    const shown = bigText(item);
+    prompt.append(shown);
+    if (quiz.timer > 0) {
+      // Count down, then hide the character so it is written from memory.
+      let left = quiz.timer;
+      $('qStatus').textContent = `Look carefully — it hides in ${left} s`;
+      quiz.hideTimer = setInterval(() => {
+        left--;
+        if (left > 0) { $('qStatus').textContent = `Look carefully — it hides in ${left} s`; return; }
+        clearInterval(quiz.hideTimer);
+        shown.className = 'q-hidden';
+        shown.textContent = '？'.repeat(Math.max(1, chars.length));
+        $('qStatus').textContent = 'Now write it from memory' + count;
+      }, 1000);
+    } else {
+      $('qStatus').textContent = 'Write it' + count;
+    }
+  }
+  if (run !== quiz.run) return;
+  $('qWriteArea').hidden = false;
+  let mistakes = 0;
+  let gaveUp = false;
+  const landscape = window.innerWidth > window.innerHeight && window.innerHeight < 700;
+  const size = landscape
+    ? Math.max(180, Math.min(window.innerHeight - 100, window.innerWidth * 0.45, 460))
+    : Math.max(200, Math.min(window.innerWidth - 40, window.innerHeight - 380, 460));
+  drawWriterGrid(size, $('qGrid'));
+
+  const finish = async () => {
+    if (run !== quiz.run) return;
+    for (const ch of chars) recordQuiz(ch, mistakes);
+    const ok = !gaveUp && mistakes === 0;
+    $('qStatus').textContent = gaveUp ? 'Here is how it is written.' : ok ? '🎉 Perfect — no mistakes!' : `Done — ${mistakes} ${mistakes === 1 ? 'mistake' : 'mistakes'}`;
+    // The character was written, so it's in the box; the answer shows the whole word and its reading.
+    const answer = await answerFor(item, quiz.opt === 'en' ? 'en' : '');
+    if (run !== quiz.run) return;
+    $('qAnswer').textContent = '';
+    $('qAnswer').append(answer);
+    $('qAnswer').hidden = false;
+    speak(item);
+    quizButtons([['Next →', () => nextQuizItem(item, ok, gaveUp ? 'shown' : mistakes)]]);
+  };
+
+  // Each character in turn, from a blank box: no outline, and a hint only after 3 misses on a stroke.
+  const writeChar = async (k) => {
+    if (run !== quiz.run) return;
+    if (k >= chars.length) return finish();
+    const ch = chars[k];
+    const target = $('qWriter');
+    target.innerHTML = '';
+    const data = await loadChar(ch);
+    if (run !== quiz.run) return;
+    if (!data) {
+      toast(`No stroke data for ${ch} — skipped`);
+      return writeChar(k + 1);
+    }
+    if (chars.length > 1) $('qProgress').textContent = `${quiz.i + 1} / ${quiz.deck.length} · character ${k + 1} of ${chars.length}`;
+    quiz.writer = HanziWriter.create(target, ch, {
+      width: size,
+      height: size,
+      padding: Math.round(size * 0.06),
+      showOutline: false,
+      showCharacter: false,
+      strokeColor: '#222222',
+      outlineColor: '#DDDDDD',
+      drawingColor: '#1E88E5',
+      drawingWidth: Math.max(6, Math.round(size / 28)),
+      highlightColor: '#FFB300',
+      charDataLoader: (c, onLoad, onError) => {
+        loadChar(c).then((d) => (d ? onLoad(d) : onError(new Error('no data'))));
+      },
+    });
+    const w = quiz.writer;
+    quizButtons([['Show me', async () => {
+      gaveUp = true;
+      w.cancelQuiz();
+      await w.animateCharacter();
+      if (run === quiz.run) writeChar(k + 1);
+    }]]);
+    w.quiz({
+      showHintAfterMisses: 3,
+      onCorrectStroke: (d) => { if (d.strokesRemaining) $('qStatus').textContent = `✓ ${d.strokesRemaining} more ${d.strokesRemaining === 1 ? 'stroke' : 'strokes'}`; },
+      onMistake: (d) => {
+        mistakes++;
+        $('qStatus').textContent = d.mistakesOnStroke >= 3 ? 'Follow the hint' : 'Not quite — try that stroke again';
+      },
+      onComplete: () => setTimeout(() => writeChar(k + 1), 600),
+    });
+  };
+  writeChar(0);
+}
+
+function showQuizSummary() {
+  stopQuizItem();
+  $('qProgress').textContent = '';
+  document.querySelector('.q-side').hidden = true;
+  $('qPrompt').hidden = true;
+  $('qAnswer').hidden = true;
+  $('qWriteArea').hidden = true;
+  $('qButtons').hidden = true;
+  $('qStatus').textContent = '';
+  const results = Array.from(quiz.results.entries());
+  const right = results.filter(([, r]) => r.ok).length;
+  const out = $('qSummary');
+  out.textContent = '';
+  const head = document.createElement('h2');
+  head.textContent = `${right} of ${results.length} right first time`;
+  const list = document.createElement('ul');
+  for (const [item, r] of results) {
+    const li = document.createElement('li');
+    const note = quiz.mode === 'write' ? (r.detail === 'shown' ? ' — shown' : r.ok ? '' : ` — ${r.detail} ${r.detail === 1 ? 'mistake' : 'mistakes'}`) : '';
+    li.textContent = `${r.ok ? '✓' : '✗'} ${item}${note}`;
+    list.appendChild(li);
+  }
+  const missed = results.filter(([, r]) => !r.ok).map(([item]) => item);
+  const buttons = document.createElement('div');
+  buttons.className = 'q-buttons';
+  if (missed.length) {
+    const again = document.createElement('button');
+    again.className = 'primary';
+    again.textContent = `Quiz the ${missed.length} missed again`;
+    again.onclick = () => startQuiz(quiz.mode, quiz.opt, quiz.timer, missed);
+    buttons.appendChild(again);
+  }
+  const done = document.createElement('button');
+  done.textContent = 'Done';
+  done.onclick = closeQuiz;
+  buttons.appendChild(done);
+  out.append(head, list, buttons);
+  out.hidden = false;
+}
+
+// ---------------------------------------------------------------- Chinese → English (quiz meanings)
+
+const wordIndex = new Map();
+
+/* Dictionary entries whose headword (traditional or simplified) is this word. */
+async function dictEntriesFor(word) {
+  if (!dictMeta) dictMeta = (await dictFile('meta')) || { chunk: 1000 };
+  const shard = (word.codePointAt(0) >> Core.SHARD_BITS).toString(16);
+  if (!wordIndex.has(shard)) wordIndex.set(shard, dictFile('c' + shard));
+  const ids = ((await wordIndex.get(shard)) || {})[word] || [];
+  const entries = await Promise.all(ids.map(async (i) => {
+    const c = Math.floor(i / dictMeta.chunk);
+    if (!dictChunks.has(c)) dictChunks.set(c, dictFile('e' + c));
+    return ((await dictChunks.get(c)) || [])[i % dictMeta.chunk];
+  }));
+  return entries.filter(Boolean);
+}
+
+/* A short English meaning for a character or word, e.g. 華 → "flower; magnificent; splendid". */
+async function meaningOf(word) {
+  let entries = await dictEntriesFor(word);
+  // Everyday meanings: names of people and places (capitalised pinyin) only when there is nothing else.
+  const common = entries.filter((e) => !/^[A-Z]/.test(e[2]));
+  if (common.length) entries = common;
+  const glosses = [];
+  for (const e of entries.slice(0, 4)) {
+    for (let g of e[4].split(';')) {
+      g = g.trim();
+      // Skip cross-references ("variant of 唔", "see …"): they name other Chinese words, which would give the answer away.
+      if (!g || /\p{Script=Han}/u.test(g) || /^(old )?variant of|^see |^used in /i.test(g)) continue;
+      if (!glosses.includes(g)) glosses.push(g);
+    }
+  }
+  // Plain meanings first; labelled ones such as "(Beijing dialect) stupid" only when there is nothing else.
+  const plain = glosses.filter((g) => !g.startsWith('('));
+  if (glosses.length) return (plain.length ? plain : glosses).slice(0, 3).join('; ');
+  // Not in the dictionary as a whole: the meanings of its characters.
+  const chars = Array.from(word).filter(isHan);
+  if (chars.length > 1) {
+    const parts = await Promise.all(chars.map(async (c) => ((await meaningOf(c)) || '?').split(';')[0]));
+    return parts.join(' + ');
+  }
+  return '';
+}
+
+// ---------------------------------------------------------------- handwriting pad (New worksheet)
+
+/* A teacher writes characters with a stylus (or finger); the app recognises them (ML Kit, on the device) and the
+   chosen one is added to the New worksheet box. Strokes are [x, y, t, x, y, t, …] in CSS px and ms. */
+const hand = { strokes: [], current: null, penSeen: false, timer: 0, request: 0, t0: 0 };
+
+function setupHandPad() {
+  if (!Native || !Native.recognizeInk) return; // recognition is done by the app
+  $('handBtn').hidden = false;
+  $('handBtn').onclick = openHandPad;
+  const canvas = $('hCanvas');
+  const point = (e) => {
+    const r = canvas.getBoundingClientRect();
+    hand.current.push(Math.round(e.clientX - r.left), Math.round(e.clientY - r.top), Math.round(e.timeStamp - hand.t0));
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'pen') hand.penSeen = true;
+    else if (hand.penSeen && e.pointerType === 'touch') return; // a hand resting on the screen while writing with a stylus
+    canvas.setPointerCapture(e.pointerId);
+    clearTimeout(hand.timer);
+    if (!hand.strokes.length) hand.t0 = e.timeStamp;
+    hand.current = [];
+    hand.strokes.push(hand.current);
+    point(e);
+    drawHand();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!hand.current) return;
+    for (const p of (e.getCoalescedEvents ? e.getCoalescedEvents() : [e])) point(p);
+    drawHand();
+  });
+  const end = () => {
+    if (!hand.current) return;
+    hand.current = null;
+    // Recognise once the writer pauses, so a character isn't guessed after each stroke.
+    hand.timer = setTimeout(recognizeHand, 400);
+  };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  $('hClear').onclick = clearHand;
+  $('hSpace').onclick = () => addToBox(' ');
+  $('hDel').onclick = () => {
+    const f = $('fChars');
+    f.value = Array.from(f.value.replace(/\s+$/, '')).slice(0, -1).join('');
+    handBoxChanged();
+  };
+  $('hDone').onclick = closeHandPad;
+  $('hClose').onclick = closeHandPad;
+}
+
+function openHandPad() {
+  $('handPad').hidden = false;
+  clearHand();
+  handBoxChanged();
+  // Starts the one-time model download now, rather than after the first character is written.
+  const r = $('hCanvas').getBoundingClientRect();
+  Native.recognizeInk(++hand.request, state.lang, '[]', r.width, r.height);
+}
+
+function closeHandPad() {
+  clearTimeout(hand.timer);
+  $('handPad').hidden = true;
+}
+
+function clearHand() {
+  clearTimeout(hand.timer);
+  hand.strokes = [];
+  hand.current = null;
+  hand.request++;
+  $('hCands').textContent = '';
+  drawHand();
+}
+
+function drawHand() {
+  const canvas = $('hCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  if (canvas.width !== Math.round(r.width * dpr)) {
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+  }
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, r.width, r.height);
+  g.strokeStyle = '#212121';
+  g.lineWidth = Math.max(4, r.width / 60);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for (const s of hand.strokes) {
+    g.beginPath();
+    g.moveTo(s[0], s[1]);
+    for (let i = 3; i < s.length; i += 3) g.lineTo(s[i], s[i + 1]);
+    if (s.length === 3) g.lineTo(s[0] + 0.1, s[1]);
+    g.stroke();
+  }
+}
+
+function recognizeHand() {
+  if (!hand.strokes.length) return;
+  const r = $('hCanvas').getBoundingClientRect();
+  Native.recognizeInk(++hand.request, state.lang, JSON.stringify(hand.strokes), r.width, r.height);
+}
+
+window.inkResult = function inkResult(id, result) {
+  if (id !== hand.request || $('handPad').hidden) return;
+  const status = $('hStatus');
+  if (result.downloading) {
+    status.textContent = 'Getting handwriting recognition ready (a one-time download)…';
+    return;
+  }
+  if (result.error) {
+    status.textContent = 'Handwriting recognition isn\'t ready: connect to the internet once so it can download. (' + result.error + ')';
+    return;
+  }
+  status.textContent = hand.strokes.length ? 'Tap the right character:' : 'Write a character in the square, then tap the right one below.';
+  const out = $('hCands');
+  out.textContent = '';
+  for (const c of result.candidates.filter((t) => Array.from(t).some(isHan)).slice(0, 8)) {
+    const b = document.createElement('button');
+    b.textContent = c;
+    b.onclick = () => { addToBox(c); clearHand(); };
+    out.appendChild(b);
+  }
+};
+
+function addToBox(text) {
+  const f = $('fChars');
+  f.value = (text === ' ' ? f.value.replace(/\s+$/, '') : f.value) + text;
+  handBoxChanged();
+}
+
+function handBoxChanged() {
+  $('hText').textContent = $('fChars').value.trim() || '—';
+  renderTranslations();
+}
+
 // ---------------------------------------------------------------- worksheet view
 
 async function openSheet(ws) {
@@ -1312,6 +1817,8 @@ function setupSheet() {
 // Android back button: returns true when handled here.
 window.handleBack = function handleBack() {
   if (!$('practice').hidden) { closePractice(); return true; }
+  if (!$('handPad').hidden) { closeHandPad(); return true; }
+  if (!$('quizView').hidden) { closeQuiz(); return true; }
   if (!$('printDialog').hidden) { $('printDialog').hidden = true; return true; }
   if (!$('sheet').hidden) {
     if (state.autoStarted) { saveInk(); return false; }
@@ -1345,6 +1852,8 @@ setupInk($('rowView'));
 setupRowView();
 setupPractice();
 setupPrint();
+setupHandPad();
+setupQuiz();
 setupLists();
 renderLists();
 migrateSavedWorksheets();

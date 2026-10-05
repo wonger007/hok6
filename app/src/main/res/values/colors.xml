@@ -9,6 +9,4 @@
     <color name="selected_bg">#29C62828</color>
     <color name="pdf_bg">#808080</color>
     <color name="indicator_bg">#99000000</color>
-    <color name="tool_bg">#F5FFFFFF</color>
-    <color name="tool_selected">#40C62828</color>
 </resources>

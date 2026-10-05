@@ -24,6 +24,8 @@ import androidx.webkit.WebViewAssetLoader
 import android.content.Intent
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.Locale
@@ -51,6 +53,7 @@ class TrainingActivity : AppCompatActivity() {
     // After a restore, reload the page so it shows the restored history and writing.
     private val backup = BackupActions(this) { web.reload() }
     private var pendingSpeech: Triple<String, String, Float>? = null
+    private val handwriting = Handwriting()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,6 +107,7 @@ class TrainingActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         tts?.shutdown()
+        handwriting.close()
         web.destroy()
         super.onDestroy()
     }
@@ -182,6 +186,22 @@ class TrainingActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun close() = runOnUiThread { finish() }
+
+        /**
+         * Handwriting pad: recognises [strokes] (JSON `[[x, y, t, …], …]` on a [width] × [height] area) and answers
+         * with `inkResult(id, {candidates: [...]} | {downloading: true} | {error: "..."})`.
+         */
+        @JavascriptInterface
+        fun recognizeInk(id: Int, lang: String, strokes: String, width: Float, height: Float) = runOnUiThread {
+            handwriting.recognize(lang, JSONArray(strokes), width, height) { result ->
+                val json = when (result) {
+                    is Handwriting.Result.Candidates -> JSONObject().put("candidates", JSONArray(result.texts))
+                    Handwriting.Result.Downloading -> JSONObject().put("downloading", true)
+                    is Handwriting.Result.Failed -> JSONObject().put("error", result.message)
+                }
+                if (!isDestroyed) web.evaluateJavascript("window.inkResult && inkResult($id, $json)", null)
+            }
+        }
 
         /** Share PDF: the page sends each worksheet page as shapes and text (see [PageDrawing]), then [shareFinish] opens the share menu. */
         @JavascriptInterface

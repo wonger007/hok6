@@ -1,12 +1,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/toggle_list"
-        android:icon="@drawable/ic_list"
-        android:title="@string/toggle_list"
-        app:iconTint="?attr/colorOnPrimary"
-        app:showAsAction="ifRoom" />
-    <item
         android:id="@+id/writing_practice"
         android:icon="@drawable/ic_pen"
         android:title="@string/writing_practice"

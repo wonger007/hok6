@@ -9,6 +9,8 @@
     </style>
 
     <style name="Theme.StudyBook.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Selecting files shows its bar over the title bar, not above it. -->
+        <item name="windowActionModeOverlay">true</item>
         <item name="colorPrimary">@color/brand</item>
         <item name="colorPrimaryVariant">@color/brand_dark</item>
         <item name="colorOnPrimary">#FFFFFF</item>
@@ -23,7 +25,25 @@
         <item name="tint">?attr/colorControlNormal</item>
     </style>
 
-    <style name="ToolButton" parent="PlayerButton">
-        <item name="tint">#424242</item>
+    <!-- Tools in the title bar of the chapter screen -->
+    <style name="BarButton">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:scaleType">center</item>
+        <item name="tint">?attr/colorOnPrimarySurface</item>
     </style>
+
+    <style name="BarTextButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:textColor">?attr/colorOnPrimarySurface</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
 </resources>

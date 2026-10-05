@@ -6,5 +6,5 @@ local.properties
 .kotlin/
 
 # Local test book folder (sample chapters/files pushed to the emulator or tablet)
-test/
+/test/
 tools/.cache/
