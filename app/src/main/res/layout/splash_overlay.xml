@@ -1,28 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shown while a screen loads: the app's name, its tag line and a progress bar, on the same red as Android's own
-     splash, so one leads straight into the other. -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Shown while a screen loads: the app's name and tag line, with a moving progress bar in the middle of the screen so
+     it's clear Hok6 is working, on the same red as Android's own splash, so one leads straight into the other. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/splash"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/brand"
     android:clickable="true"
-    android:focusable="true">
+    android:focusable="true"
+    android:gravity="center_horizontal"
+    android:orientation="vertical">
 
+    <!-- The top half: the name, sitting just above the middle. -->
     <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center_horizontal"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="bottom|center_horizontal"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="28dp">
 
         <ImageView
-            android:layout_width="220dp"
-            android:layout_height="220dp"
-            android:layout_marginTop="-40dp"
-            android:layout_marginBottom="-40dp"
+            android:layout_width="@dimen/splash_logo"
+            android:layout_height="@dimen/splash_logo"
+            android:layout_marginBottom="@dimen/splash_logo_overlap"
             android:importantForAccessibility="no"
             android:src="@drawable/ic_launcher_foreground" />
 
@@ -43,17 +47,22 @@
             android:textColor="#E6FFFFFF"
             android:textSize="18sp"
             android:textStyle="italic" />
-
-        <com.google.android.material.progressindicator.LinearProgressIndicator
-            android:id="@+id/splash_progress"
-            android:layout_width="220dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:contentDescription="@string/loading"
-            android:indeterminate="true"
-            app:indicatorColor="#FFFFFF"
-            app:trackColor="#59FFFFFF"
-            app:trackCornerRadius="3dp"
-            app:trackThickness="6dp" />
     </LinearLayout>
-</FrameLayout>
+
+    <!-- The middle of the screen. -->
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/splash_progress"
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/loading"
+        android:indeterminate="true"
+        app:indicatorColor="#FFFFFF"
+        app:trackColor="#59FFFFFF"
+        app:trackCornerRadius="4dp"
+        app:trackThickness="8dp" />
+
+    <Space
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+</LinearLayout>

@@ -78,6 +78,7 @@ const state = {
   tool: 'pen',
   fingerDraw: store.get('fingerDraw', true),
   zoom: store.get('zoom', 1),
+  speed: [1, 0.75, 0.5].includes(store.get('speed', 1)) ? store.get('speed', 1) : 1,
   view: IS_PHONE ? store.get('phoneView', 'row') : 'page',
   layouts: [],
   row: 0,
@@ -352,7 +353,7 @@ function setupRowView() {
   $('wordNext').onclick = () => selectWord(state.row + 1);
   $('wordSelect').onchange = () => selectWord(Number($('wordSelect').value));
   $('wordSay').onclick = () => speak(state.ws.words[state.row]);
-  $('wordSlow').onclick = () => speak(state.ws.words[state.row], SLOW);
+  speedButton($('wordSlow'), () => state.ws.words[state.row]);
   $('wordStar').onclick = () => { $('wordStar').textContent = toggleBookmark(state.ws.words[state.row]) ? '★' : '☆'; };
   $('viewBtn').onclick = () => setView(state.view === 'row' ? 'page' : 'row');
   $('viewBtn').hidden = !IS_PHONE;
@@ -649,8 +650,8 @@ function clearScreen() {
 
 // ---------------------------------------------------------------- speech & language
 
-/* Reads text aloud in the chosen language; rate below 1 is slower (for listening practice). */
-function speak(textToSay, rate = 1) {
+/* Reads text aloud in the chosen language, at the chosen speed unless [rate] is given (below 1 is slower). */
+function speak(textToSay, rate = state.speed) {
   if (Native && Native.speakAt) {
     Native.speakAt(textToSay, state.lang, rate);
   } else if (Native && Native.speak) {
@@ -663,7 +664,31 @@ function speak(textToSay, rate = 1) {
   }
 }
 
-const SLOW = 0.55;
+/* Speaking speeds the speed buttons step through, like the audio player's; one setting for every 🔊. */
+const SPEEDS = [1, 0.75, 0.5]; // also in state.speed
+
+function speedLabel() {
+  return state.speed + '×';
+}
+
+function showSpeed() {
+  document.querySelectorAll('.speed').forEach((b) => { b.textContent = speedLabel(); });
+}
+
+/* A speed button: each tap goes to the next speed and says [textOf]() at it, so the difference is heard straight away. */
+function speedButton(btn, textOf) {
+  btn.classList.add('speed');
+  btn.setAttribute('aria-label', 'Speaking speed');
+  btn.textContent = speedLabel();
+  btn.onclick = () => {
+    state.speed = SPEEDS[(SPEEDS.indexOf(state.speed) + 1) % SPEEDS.length];
+    store.set('speed', state.speed);
+    showSpeed();
+    const t = textOf();
+    if (t) speak(t);
+  };
+  return btn;
+}
 function toneLabel(reading) {
   return Core.toneLabel(reading, state.lang);
 }
@@ -822,6 +847,10 @@ function setupLists() {
     $('backUpBtn').onclick = () => { saveInk(); Native.backUp(); };
     $('restoreBtn').onclick = () => Native.restore();
   }
+  if (Native && Native.settings) {
+    $('downloadsRow').hidden = false;
+    $('downloadsBtn').onclick = () => Native.settings();
+  }
   $('bmPractise').onclick = () => {
     const all = bookmarks().join('');
     if (all) practiseText('★ Bookmarks ' + new Date().toLocaleDateString(), all, false);
@@ -954,10 +983,10 @@ function setupPractice() {
   $('pPrev').onclick = () => { if (pIndex > 0) openPractice(pIndex - 1); };
   $('pNext').onclick = () => { if (pIndex < state.ws.chars.length - 1) openPractice(pIndex + 1); };
   $('pRoman').onclick = () => speak(state.ws.chars[pIndex]);
-  $('pSlow').onclick = () => speak(state.ws.chars[pIndex], SLOW);
+  speedButton($('pSlow'), () => state.ws.chars[pIndex]);
   $('pStar').onclick = () => { $('pStar').textContent = toggleBookmark(state.ws.chars[pIndex]) ? '★' : '☆'; };
   $('pWordSay').onclick = () => { const w = wordOf(state.ws.chars[pIndex]); if (w) speak(w); };
-  $('pWordSlow').onclick = () => { const w = wordOf(state.ws.chars[pIndex]); if (w) speak(w, SLOW); };
+  speedButton($('pWordSlow'), () => wordOf(state.ws.chars[pIndex]));
   $('pAnimate').onclick = () => {
     if (!writer) return;
     stepIdx = 0;
@@ -1422,11 +1451,8 @@ function soundButtons(item, auto) {
   play.textContent = '🔊';
   play.setAttribute('aria-label', 'Play the sound');
   play.onclick = () => speak(item);
-  const slow = document.createElement('button');
-  slow.className = 'q-sound';
-  slow.textContent = '🐢';
-  slow.setAttribute('aria-label', 'Play it slowly');
-  slow.onclick = () => speak(item, SLOW);
+  const slow = speedButton(document.createElement('button'), () => item);
+  slow.classList.add('q-sound');
   row.append(play, slow);
   if (auto) setTimeout(() => speak(item), 300);
   return row;
@@ -1791,8 +1817,12 @@ window.inkResult = function inkResult(id, result) {
     status.textContent = 'Getting handwriting recognition ready (a one-time download)…';
     return;
   }
+  if (result.missing) {
+    status.textContent = 'Handwriting recognition needs a one-time download: Settings (⋮ on the main screen) → Download all, with Wi-Fi on.';
+    return;
+  }
   if (result.error) {
-    status.textContent = 'Handwriting recognition isn\'t ready: connect to the internet once so it can download. (' + result.error + ')';
+    status.textContent = 'Handwriting recognition isn\'t ready: check Wi-Fi, then Settings (⋮ on the main screen) → Download all. (' + result.error + ')';
     return;
   }
   status.textContent = hand.strokes.length ? 'Tap the right character:' : 'Write a character in the square, then tap the right one below.';

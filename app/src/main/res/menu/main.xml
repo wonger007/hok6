@@ -25,7 +25,7 @@
         android:title="@string/restore"
         app:showAsAction="never" />
     <item
-        android:id="@+id/appearance"
-        android:title="@string/appearance"
+        android:id="@+id/settings"
+        android:title="@string/settings"
         app:showAsAction="never" />
 </menu>

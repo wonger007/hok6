@@ -29,7 +29,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
-import java.util.Locale
 
 /**
  * Writing practice: worksheets with stroke order (Hanzi Writer), written on with finger or stylus,
@@ -55,6 +54,9 @@ class TrainingActivity : AppCompatActivity() {
     private val backup = BackupActions(this) { web.reload() }
     private var pendingSpeech: Triple<String, String, Float>? = null
     private val handwriting = Handwriting()
+    /** Languages whose missing voice or handwriting has been offered on this visit, so it's asked only once. */
+    private val askedVoice = HashSet<String>()
+    private val askedHand = HashSet<String>()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -128,20 +130,50 @@ class TrainingActivity : AppCompatActivity() {
 
     private fun speakNow(text: String, lang: String, rate: Float) {
         val engine = tts ?: return
-        val locales = if (lang == "yue") {
-            listOf(Locale("yue", "HK"), Locale("zh", "HK"))
-        } else {
-            listOf(Locale.SIMPLIFIED_CHINESE, Locale.TRADITIONAL_CHINESE)
-        }
-        val locale = locales.firstOrNull { engine.isLanguageAvailable(it) >= TextToSpeech.LANG_AVAILABLE }
-        if (locale == null) {
-            val name = if (lang == "yue") "Cantonese" else "Mandarin"
-            Toast.makeText(this, getString(R.string.tts_missing, name), Toast.LENGTH_LONG).show()
-            return
-        }
+        val locale = Voices.find(engine, lang)
+        if (locale == null) return voiceMissing(lang)
         engine.language = locale
         engine.setSpeechRate(rate)
         engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "speak")
+    }
+
+    /** Offers to add the voice, once per visit to this screen; a short note otherwise (or once reminders are off). */
+    private fun voiceMissing(lang: String) {
+        if (Downloads.remind(this) && askedVoice.add(lang)) {
+            Downloads.ask(this, Downloads.Need.VOICE, lang) { Voices.install(this, tts?.defaultEngine) }
+            return
+        }
+        val name = getString(if (lang == "yue") R.string.cantonese else R.string.mandarin)
+        Toast.makeText(this, getString(R.string.tts_missing, name), Toast.LENGTH_LONG).show()
+    }
+
+    private fun recognizeNow(id: Int, lang: String, strokes: String, width: Float, height: Float) {
+        handwriting.recognize(lang, JSONArray(strokes), width, height) { result ->
+            val json = when (result) {
+                is Handwriting.Result.Candidates -> JSONObject().put("candidates", JSONArray(result.texts))
+                Handwriting.Result.Downloading -> JSONObject().put("downloading", true)
+                Handwriting.Result.Missing -> JSONObject().put("missing", true)
+                is Handwriting.Result.Failed -> JSONObject().put("error", result.message)
+            }
+            if (isDestroyed) return@recognize
+            web.evaluateJavascript("window.inkResult && inkResult($id, $json)", null)
+            if (result == Handwriting.Result.Missing) {
+                handwritingMissing(lang) { recognizeNow(id, lang, strokes, width, height) }
+            }
+        }
+    }
+
+    /** Offers the handwriting download (once per visit to this screen); recognises [retry] when it's done. */
+    private fun handwritingMissing(lang: String, retry: () -> Unit) {
+        if (!askedHand.add(lang)) return
+        Downloads.ask(this, Downloads.Need.HANDWRITING, lang) {
+            Downloads.downloadHandwriting(lang) { error ->
+                if (isDestroyed) return@downloadHandwriting
+                if (error == null) retry()
+                else Toast.makeText(this, getString(R.string.need_failed), Toast.LENGTH_LONG).show()
+            }
+            retry()
+        }
     }
 
     private fun print(title: String) {
@@ -206,19 +238,16 @@ class TrainingActivity : AppCompatActivity() {
 
         /**
          * Handwriting pad: recognises [strokes] (JSON `[[x, y, t, …], …]` on a [width] × [height] area) and answers
-         * with `inkResult(id, {candidates: [...]} | {downloading: true} | {error: "..."})`.
+         * with `inkResult(id, {candidates: [...]} | {downloading: true} | {missing: true} | {error: "..."})`.
+         * When the model is missing it offers the download, and answers again once it's done.
          */
         @JavascriptInterface
         fun recognizeInk(id: Int, lang: String, strokes: String, width: Float, height: Float) = runOnUiThread {
-            handwriting.recognize(lang, JSONArray(strokes), width, height) { result ->
-                val json = when (result) {
-                    is Handwriting.Result.Candidates -> JSONObject().put("candidates", JSONArray(result.texts))
-                    Handwriting.Result.Downloading -> JSONObject().put("downloading", true)
-                    is Handwriting.Result.Failed -> JSONObject().put("error", result.message)
-                }
-                if (!isDestroyed) web.evaluateJavascript("window.inkResult && inkResult($id, $json)", null)
-            }
+            recognizeNow(id, lang, strokes, width, height)
         }
+
+        @JavascriptInterface
+        fun settings() = runOnUiThread { startActivity(Intent(this@TrainingActivity, SettingsActivity::class.java)) }
 
         /** Share PDF: the page sends each worksheet page as shapes and text (see [PageDrawing]), then [shareFinish] opens the share menu. */
         @JavascriptInterface
@@ -289,6 +318,8 @@ class TrainingActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun restore() = runOnUiThread { backup.restore() }
+
+
 
         @JavascriptInterface
         fun initialText(): String = intent.getStringExtra(EXTRA_TEXT).orEmpty()

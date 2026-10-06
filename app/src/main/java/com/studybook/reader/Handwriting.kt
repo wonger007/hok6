@@ -1,7 +1,5 @@
 package com.studybook.reader
 
-import com.google.mlkit.common.model.DownloadConditions
-import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognition
 import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModel
 import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModelIdentifier
@@ -14,13 +12,16 @@ import org.json.JSONArray
 
 /**
  * Handwritten Chinese → characters, with ML Kit Digital Ink Recognition (on device). The recognition model for the
- * language is downloaded the first time (needs internet once), then works offline.
+ * language is downloaded once (see [Downloads]), then works offline. Recognition doesn't download it by itself:
+ * it answers [Result.Missing], and the screen offers the download.
  */
 class Handwriting {
     sealed interface Result {
         class Candidates(val texts: List<String>) : Result
         /** The model is being downloaded; recognition follows when it's done. */
         object Downloading : Result
+        /** The model isn't on the device and isn't being downloaded. */
+        object Missing : Result
         class Failed(val message: String) : Result
     }
 
@@ -35,21 +36,20 @@ class Handwriting {
         val model = model(lang) ?: return onResult(Result.Failed("handwriting recognition isn't available for Chinese"))
         val tag = model.modelIdentifier.languageTag
         if (tag in ready) return run(tag, model, strokes, width, height, onResult)
-        val manager = RemoteModelManager.getInstance()
-        manager.isModelDownloaded(model).addOnSuccessListener { downloaded ->
+        if (Downloads.isDownloading(lang)) {
+            onResult(Result.Downloading)
+            Downloads.downloadHandwriting(lang) { error ->
+                if (error == null) recognize(lang, strokes, width, height, onResult)
+                else onResult(Result.Failed("download: ${error.message}"))
+            }
+            return
+        }
+        Downloads.handwritingReady(lang) { downloaded ->
             if (downloaded) {
                 ready += tag
                 run(tag, model, strokes, width, height, onResult)
-                return@addOnSuccessListener
-            }
-            onResult(Result.Downloading)
-            manager.download(model, DownloadConditions.Builder().build())
-                .addOnSuccessListener {
-                    ready += tag
-                    run(tag, model, strokes, width, height, onResult)
-                }
-                .addOnFailureListener { onResult(Result.Failed("download: ${it.message}")) }
-        }.addOnFailureListener { onResult(Result.Failed(it.message ?: it.javaClass.simpleName)) }
+            } else onResult(Result.Missing)
+        }
     }
 
     private fun run(tag: String, model: DigitalInkRecognitionModel, strokes: JSONArray, width: Float, height: Float,
@@ -85,7 +85,7 @@ class Handwriting {
         private fun tags(lang: String) =
             if (lang == "cmn") listOf("zh-Hani-CN", "zh-Hani", "zh-Hani-TW") else listOf("zh-Hani-HK", "zh-Hani-TW", "zh-Hani")
 
-        private fun model(lang: String): DigitalInkRecognitionModel? = tags(lang).firstNotNullOfOrNull { tag ->
+        fun model(lang: String): DigitalInkRecognitionModel? = tags(lang).firstNotNullOfOrNull { tag ->
             runCatching { DigitalInkRecognitionModelIdentifier.fromLanguageTag(tag) }.getOrNull()
         }?.let { DigitalInkRecognitionModel.builder(it).build() }
     }

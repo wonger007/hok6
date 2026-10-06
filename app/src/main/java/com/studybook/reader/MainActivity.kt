@@ -59,6 +59,11 @@ class MainActivity : AppCompatActivity() {
         setTheme(R.style.Theme_StudyBook)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        // First start: the welcome screen, with what to download (it shows Hok6's name, so no splash as well).
+        if (savedInstanceState == null && !Downloads.setupDone(this)) {
+            splashShown = true
+            startActivity(Intent(this, SetupActivity::class.java))
+        }
         if (savedInstanceState == null && !splashShown) {
             splashShown = true
             supportActionBar?.hide()
@@ -114,7 +119,7 @@ class MainActivity : AppCompatActivity() {
             R.id.new_folder -> newFolder()
             R.id.back_up -> backup.backUp()
             R.id.restore -> backup.restore()
-            R.id.appearance -> Appearance.choose(this)
+            R.id.settings -> startActivity(Intent(this, SettingsActivity::class.java))
             else -> return super.onOptionsItemSelected(item)
         }
         return true

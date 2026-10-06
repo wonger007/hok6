@@ -124,13 +124,16 @@
       <h2>About Hok6</h2>
       <p><b>Hok6</b> (學, hok6) — where you learn, study, and imitate.</p>
       <h3>Device settings</h3>
+      <p id="downloadsRow" hidden><button id="downloadsBtn" class="small">⚙ Settings…</button>
+        <span class="muted">download handwriting and voices for Cantonese and Mandarin, light or dark</span></p>
       <p class="muted">Menu names differ a little between makers; if one isn't where it's shown, search for it in Settings.</p>
       <ul class="settings">
         <li><b>Chinese voices</b> for 🔊 and the Sound → Chinese quiz: Settings → System → Languages &amp; input →
           Text-to-speech output → engine <b>Speech Services by Google</b> → ⚙ → Install voice data →
           <b>Chinese (Hong Kong) / 粵語</b> for Cantonese and <b>Chinese (China) / 普通话</b> for Mandarin.</li>
-        <li><b>Internet once</b>: the first time you tap ✍ Write by hand, the handwriting model downloads; after that it
-          works offline, like everything else.</li>
+        <li><b>Internet once</b>: <b>Settings → Download all</b> (above, or ⋮ → Settings on the main screen; also
+          offered on first start) gets the handwriting models and opens the voice screen for you; after that Hok6
+          works offline. The dictionary is built in.</li>
         <li><b>Backup</b> (nothing to set): your writing, tracing, history and quiz are kept in your book folder as
           <b>Hok6 backup.json</b>, on the device, not in Google Drive. After reinstalling, choose the same book folder
           and tap Restore. <b>Back up…</b> under History saves a copy anywhere else.</li>
@@ -189,7 +192,7 @@
     <select id="wordSelect" aria-label="Word to practice"></select>
     <button class="icon nav" id="wordNext" aria-label="Next word">›</button>
     <button class="icon" id="wordSay" aria-label="Say the word">🔊</button>
-    <button class="icon" id="wordSlow" aria-label="Say the word slowly">🐢</button>
+    <button class="icon speed" id="wordSlow" aria-label="Speaking speed">1×</button>
     <button class="icon star" id="wordStar" aria-label="Bookmark this word">☆</button>
   </div>
   <div id="pages"></div>
@@ -236,7 +239,7 @@
         <div class="pron">
           <div class="pron-row">
             <button id="pRoman" class="roman-btn"></button>
-            <button class="icon" id="pSlow" aria-label="Say it slowly">🐢</button>
+            <button class="icon speed" id="pSlow" aria-label="Speaking speed">1×</button>
             <button class="icon star" id="pStar" aria-label="Bookmark this character">☆</button>
           </div>
           <span id="pTone" class="tone"></span>
@@ -253,7 +256,7 @@
     <p id="pWord" class="word-line" hidden>
       in <span id="pWordText"></span>
       <button class="icon" id="pWordSay" aria-label="Say the word">🔊</button>
-      <button class="icon" id="pWordSlow" aria-label="Say the word slowly">🐢</button>
+      <button class="icon speed" id="pWordSlow" aria-label="Speaking speed">1×</button>
     </p>
     <p id="pStatus" class="status"></p>
     <div class="practice-buttons">

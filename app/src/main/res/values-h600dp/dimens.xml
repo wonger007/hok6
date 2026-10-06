@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="splash_logo">200dp</dimen>
+    <dimen name="splash_logo_overlap">-40dp</dimen>
+</resources>

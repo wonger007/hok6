@@ -21,8 +21,8 @@ where it's shown here, search for it in the Settings search bar.
 | Setting | Where | Why |
 | --- | --- | --- |
 | **Install unknown apps** | Settings → Apps → Special app access → **Install unknown apps** → the browser or Files app you downloaded with → **Allow from this source** | Hok6 isn't on the Play Store, so Android blocks the APK otherwise. If **Play Protect** warns, tap **More details → Install anyway**. You can turn the setting off again afterwards. |
-| **Chinese voices** (text-to-speech) | Settings → System → Languages & input → **Text-to-speech output** → set the engine to **Speech Services by Google** → ⚙ → **Install voice data** → download **Chinese (Hong Kong) / 粵語** for Cantonese and **Chinese (China) / 普通话** for Mandarin | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. Without one, Hok6 shows "No Cantonese voice is installed". |
-| **Internet (once)** | Wi-Fi on the first time you tap **✍ Write by hand** | Downloads the handwriting model for the language; after that it works offline. Everything else works offline. |
+| **Chinese voices** (text-to-speech) | Settings → System → Languages & input → **Text-to-speech output** → set the engine to **Speech Services by Google** → ⚙ → **Install voice data** → download **Chinese (Hong Kong) / 粵語** for Cantonese and **Chinese (China) / 普通话** for Mandarin | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. Hok6's **Download all** (on first start, or ⋮ → **Settings**) opens this screen for you. Without a voice, Hok6 offers to add one when you tap 🔊. |
+| **Internet (once)** | Wi-Fi on, then **Download all** on the welcome screen Hok6 shows the first time it opens (later: ⋮ → **Settings**, or Writing practice → About → **Settings…**) | Downloads the Cantonese and Mandarin handwriting models and opens Android's voice screen for any missing voice (or the Play Store, if Speech Services by Google isn't installed). The list ticks itself off when you come back. The English → Chinese dictionary is built in. After that Hok6 works offline. If you skip, Hok6 offers the download when a feature needs it (with **Don't remind me again**). |
 | **Auto-rotate** (optional) | Quick settings → **Auto-rotate** | Turn the tablet to portrait for a full page, landscape for wider worksheets. |
 | **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. |
 
@@ -139,7 +139,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;
   - stroke order shown above each row, plus stroke-order animation, step-by-step strokes and a writing quiz for each character;
   - Cantonese (Jyutping, Cantonese voice) or Mandarin (Pinyin, Mandarin voice);
-  - pronunciation: hear each character and the word it belongs to, at normal or slow speed, with tone names (e.g. nei5 · tone 5, low rising);
+  - pronunciation: hear each character and the word it belongs to, at 1×, 0.75× or 0.5× speed (tap the speed button next to 🔊), with tone names (e.g. nei5 · tone 5, low rising);
   - type English to get Chinese words (Cantonese or Mandarin, following the language switch), from an offline
     dictionary, shown right under the practice box;
   - the words practiced last as one-tap chips under the practice box; worksheet options folded under the Create button
@@ -161,7 +161,10 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   - export: print, or share a PDF (US Letter, 8.5 × 11 in, sharp lines and real text) with another app such as Gmail or
     WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).
-- **Light or dark**: main screen ⋮ → **Light or dark…** → *Same as the tablet* (the default), *Light* or *Dark*;
+- **Welcome screen and Settings**: the first time Hok6 opens it shows what it needs from the internet (handwriting
+  recognition and voices) with **Download all** and **Skip**. ⋮ → **Settings** has the same list any time, the
+  download reminders switch, light or dark, and the welcome screen again.
+- **Light or dark**: ⋮ → **Settings** → *Same as the tablet* (the default), *Light* or *Dark*;
   writing practice follows it too. While Hok6 starts (and while writing practice loads) a splash shows its name, tag
   line and a progress bar.
 - **Your work is backed up, on the device**: writing practice history, bookmarks and writing, the quiz and tracing are

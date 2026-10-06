@@ -5,10 +5,8 @@ import android.app.Application
 import android.content.Context
 import android.os.SystemClock
 import android.view.View
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /** Hok6 itself: applies the chosen light or dark look before any screen opens. */
 class HokApp : Application() {
@@ -32,21 +30,14 @@ object Appearance {
         AppCompatDelegate.setDefaultNightMode(MODES.firstOrNull { it.first == chosen }?.second ?: MODES[0].second)
     }
 
-    /** Asks which look to use; open screens change straight away. */
-    fun choose(activity: AppCompatActivity) {
-        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val current = MODES.indexOfFirst { it.first == prefs.getString(KEY, "system") }.coerceAtLeast(0)
-        val names = arrayOf(R.string.appearance_system, R.string.appearance_light, R.string.appearance_dark)
-            .map { activity.getString(it) }.toTypedArray()
-        MaterialAlertDialogBuilder(activity)
-            .setTitle(R.string.appearance_title)
-            .setSingleChoiceItems(names, current) { dialog, which ->
-                dialog.dismiss()
-                prefs.edit().putString(KEY, MODES[which].first).apply()
-                apply(activity)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+    /** "system", "light" or "dark". */
+    fun current(context: Context) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "system") ?: "system"
+
+    /** Uses [mode] ("system", "light" or "dark"); open screens change straight away. */
+    fun set(context: Context, mode: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, mode).apply()
+        apply(context)
     }
 }
 

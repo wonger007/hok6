@@ -332,3 +332,6 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
   svg.page:last-child { page-break-after: auto; break-after: auto; }
   body.print-blank .ink { display: none; }
 }
+/* Speed buttons show the speaking speed (1×, 0.75×, 0.5×) and step through it. */
+button.icon.speed { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 56px; }
+.q-sound.speed { font-size: 24px; font-weight: 600; }

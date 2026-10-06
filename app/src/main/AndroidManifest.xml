@@ -29,6 +29,15 @@
         </activity>
 
         <activity
+            android:name=".SetupActivity"
+            android:theme="@style/Theme.StudyBook.NoActionBar" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:label="@string/settings"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".ChapterActivity"
             android:theme="@style/Theme.StudyBook.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"

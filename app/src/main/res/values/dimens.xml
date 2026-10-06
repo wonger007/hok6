@@ -1,3 +1,7 @@
 <resources>
     <dimen name="docx_padding">16dp</dimen>
+    <dimen name="setup_side">20dp</dimen>
+    <!-- Splash logo: smaller on short screens (a phone on its side), so the name still fits above the middle. -->
+    <dimen name="splash_logo">90dp</dimen>
+    <dimen name="splash_logo_overlap">-18dp</dimen>
 </resources>
