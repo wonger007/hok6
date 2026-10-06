@@ -29,6 +29,11 @@ private const val KEY_ASKED_WRITE = "asked_backup_write"
 private val DOWNLOADS: Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download")
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        /** The splash shows once when Hok6 starts, not each time the main screen is made again (e.g. turning). */
+        private var splashShown = false
+    }
+
     private val prefs by lazy { getSharedPreferences(PREFS, MODE_PRIVATE) }
     private lateinit var list: RecyclerView
     private lateinit var empty: View
@@ -37,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private var treeUri: Uri? = null
     private val backup = BackupActions(this)
     private val writeAccess = WriteAccess(this) { treeUri }
+    /** Over the screen while the chapters load when Hok6 starts; null once gone. */
+    private var splash: Splash? = null
     private var checkingBackup = false
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -48,8 +55,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Started with the red launch theme (see Theme.StudyBook.Launch); the app's own from here on.
+        setTheme(R.style.Theme_StudyBook)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        if (savedInstanceState == null && !splashShown) {
+            splashShown = true
+            supportActionBar?.hide()
+            splash = Splash(findViewById(R.id.splash), minMs = 800) {
+                splash = null
+                supportActionBar?.show()
+            }
+        }
         list = findViewById(R.id.chapters)
         empty = findViewById(R.id.empty)
         message = findViewById(R.id.message)
@@ -97,13 +114,14 @@ class MainActivity : AppCompatActivity() {
             R.id.new_folder -> newFolder()
             R.id.back_up -> backup.backUp()
             R.id.restore -> backup.restore()
+            R.id.appearance -> Appearance.choose(this)
             else -> return super.onOptionsItemSelected(item)
         }
         return true
     }
 
     private fun load() {
-        val uri = treeUri ?: return showMessage(getString(R.string.no_folder))
+        val uri = treeUri ?: return showMessage(getString(R.string.no_folder)).also { splash?.done() }
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
@@ -119,6 +137,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             invalidateOptionsMenu()
+            splash?.done()
             result.onSuccess { (name, chapters) ->
                 title = name ?: getString(R.string.app_name)
                 adapter.items = chapters

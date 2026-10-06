@@ -2,6 +2,7 @@ package com.studybook.reader
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -113,7 +114,12 @@ class ChapterActivity : AppCompatActivity() {
         eraserButton = findViewById(R.id.ink_eraser)
         penButton = findViewById(R.id.ink_pen)
         // Files open ready to write on; Practice mode switches tapping to choosing characters instead.
-        ink = Ink(this).apply { active = true }
+        ink = Ink(this).apply {
+            active = true
+            // The title bar is red in light mode (dark grey in dark mode); a blue pen stands out against it there.
+            val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            if (!night) color = Ink.PEN_COLORS[1]
+        }
         docxText.surface = InkSurface(docxText, ink) { dy -> docxScroll.scrollBy(0, dy.toInt()) }
         docxText.customSelectionActionModeCallback = PractiseSelection()
         docxText.ink = ink

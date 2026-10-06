@@ -143,6 +143,9 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   - export: print, or share a PDF (US Letter, 8.5 × 11 in, sharp lines and real text) with another app such as Gmail or
     WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).
+- **Light or dark**: main screen ⋮ → **Light or dark…** → *Same as the tablet* (the default), *Light* or *Dark*;
+  writing practice follows it too. While Hok6 starts (and while writing practice loads) a splash shows its name, tag
+  line and a progress bar.
 - **Your work is backed up, on the device**: writing practice history, bookmarks and writing, the quiz and tracing are
   kept in the app's own storage and copied to `Hok6 backup.json` in the book folder whenever a screen is left after a
   change (the file is hidden from the chapter's file list). It survives uninstalling; choosing the book folder after

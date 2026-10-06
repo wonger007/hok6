@@ -17,6 +17,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -62,7 +63,13 @@ class TrainingActivity : AppCompatActivity() {
         // Debug builds can be inspected from Chrome DevTools (chrome://inspect).
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
         web = WebView(this)
-        setContentView(web)
+        // The page takes a second to load; Hok6's splash covers the blank screen until it's there.
+        val root = FrameLayout(this)
+        root.addView(web)
+        val splashView = layoutInflater.inflate(R.layout.splash_overlay, root, false)
+        root.addView(splashView)
+        setContentView(root)
+        val splash = Splash(splashView, minMs = 400)
 
         val assets = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
@@ -74,6 +81,8 @@ class TrainingActivity : AppCompatActivity() {
         web.settings.allowFileAccess = false
         web.webChromeClient = WebChromeClient()
         web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String) = splash.done()
+
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 assets.shouldInterceptRequest(request.url)
         }

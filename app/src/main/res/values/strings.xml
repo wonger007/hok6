@@ -1,6 +1,12 @@
 <resources>
     <string name="app_name">Hok6</string>
     <string name="tagline">Where you learn, study, and imitate.</string>
+    <string name="loading">Loading</string>
+    <string name="appearance">Light or dark…</string>
+    <string name="appearance_title">Light or dark</string>
+    <string name="appearance_system">Same as the tablet</string>
+    <string name="appearance_light">Light</string>
+    <string name="appearance_dark">Dark</string>
     <string name="choose_folder">Choose book folder</string>
     <string name="change_folder">Change book folder</string>
     <string name="no_folder">Pick the folder that holds your book. Each sub-folder inside it is shown as a chapter.</string>

@@ -24,4 +24,8 @@
         android:id="@+id/restore"
         android:title="@string/restore"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/appearance"
+        android:title="@string/appearance"
+        app:showAsAction="never" />
 </menu>

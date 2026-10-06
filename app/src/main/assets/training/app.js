@@ -73,7 +73,7 @@ const state = {
   data: {},
   ink: {},
   undo: [],
-  color: '#212121',
+  color: '#1E88E5', // blue: shows up against the red title bar, unlike the red pen
   size: 1,
   tool: 'pen',
   fingerDraw: store.get('fingerDraw', true),

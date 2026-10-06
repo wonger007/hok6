@@ -8,6 +8,11 @@
         <item name="colorOnSecondary">#000000</item>
     </style>
 
+    <!-- The main screen while Hok6 starts; it switches to Theme.StudyBook once it's running. -->
+    <style name="Theme.StudyBook.Launch" parent="Theme.StudyBook">
+        <item name="android:windowBackground">@drawable/splash_window</item>
+    </style>
+
     <style name="Theme.StudyBook.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Selecting files shows its bar over the title bar, not above it. -->
         <item name="windowActionModeOverlay">true</item>
