@@ -26,6 +26,24 @@ where it's shown here, search for it in the Settings search bar.
 | **Auto-rotate** (optional) | Quick settings → **Auto-rotate** | Turn the tablet to portrait for a full page, landscape for wider worksheets. |
 | **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. |
 
+#### Samsung Galaxy tablets (e.g. Galaxy Tab S7 FE)
+
+Samsung's menus differ from the ones above:
+
+- **Auto Blocker** (One UI 6 / Android 14) blocks installing apps from outside the Galaxy Store and Play Store.
+  Turn it off to install or update Hok6: Settings → Security and privacy → **Auto Blocker** → off. You can turn it on
+  again afterwards, but it blocks the next update the same way.
+- **Install unknown apps**: Settings → Apps → ⋮ → **Special access** → Install unknown apps → **My Files** (or Chrome)
+  → Allow.
+- **Chinese voices**: Samsung tablets start with **Samsung text-to-speech**, which may have no Cantonese. Install
+  **Speech Recognition and Synthesis from Google** from the Play Store if it isn't there, then Settings → General
+  management → **Text-to-speech** → Preferred engine → **Speech Recognition and Synthesis from Google** → ⚙ → Install
+  voice data → **Chinese (Hong Kong)** and **Chinese (China)**.
+- **Book on a microSD card**: when choosing the book folder, tap ☰ in the folder picker and pick the SD card (e.g.
+  SD card → Download → *your book*). Hok6 reads it and keeps its backup there just like on the tablet's own storage.
+- **Saving a worksheet as PDF**: Samsung asks for a folder in **My Files** (e.g. Download) and then **Done**; the file
+  is saved with a `.PDF` ending.
+
 No Google account or Google Drive is needed: Hok6 keeps its backup as a file in your book folder (see step 7).
 No other permissions are needed either: Hok6 only asks for access to the book folder you choose (step 3), and audio keeps
 playing with lock-screen controls without extra settings.
