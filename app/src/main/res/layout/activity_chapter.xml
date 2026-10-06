@@ -44,28 +44,20 @@
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:paddingEnd="4dp">
 
                     <TextView
                         android:id="@+id/practise_mode"
                         style="@style/BarTextButton"
                         android:contentDescription="@string/practise_mode"
-                        android:text="@string/practice" />
+                        android:text="@string/practice_selector" />
 
+                    <!-- The pen, in its colour; tapping it opens the colours. -->
                     <ImageButton
-                        android:id="@+id/ink_red"
+                        android:id="@+id/ink_pen"
                         style="@style/BarButton"
-                        android:contentDescription="@string/pen_red" />
-
-                    <ImageButton
-                        android:id="@+id/ink_blue"
-                        style="@style/BarButton"
-                        android:contentDescription="@string/pen_blue" />
-
-                    <ImageButton
-                        android:id="@+id/ink_black"
-                        style="@style/BarButton"
-                        android:contentDescription="@string/pen_black" />
+                        android:contentDescription="@string/pen_colour" />
 
                     <ImageButton
                         android:id="@+id/ink_size"
@@ -78,12 +70,6 @@
                         style="@style/BarButton"
                         android:contentDescription="@string/eraser"
                         android:src="@drawable/ic_eraser" />
-
-                    <ImageButton
-                        android:id="@+id/ink_undo"
-                        style="@style/BarButton"
-                        android:contentDescription="@string/undo"
-                        android:src="@drawable/ic_undo" />
 
                     <TextView
                         android:id="@+id/ink_clear"

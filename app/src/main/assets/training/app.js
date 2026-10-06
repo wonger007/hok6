@@ -103,12 +103,20 @@ function text(parent, x, y, str, attrs) {
 }
 
 let toastTimer = 0;
-function toast(msg) {
+/* A short message at the bottom; [action] ({label, run}) adds a button to it, e.g. Undo after Clear. */
+function toast(msg, action) {
   const t = $('toast');
   t.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.className = 'toast-action';
+    b.textContent = action.label;
+    b.onclick = () => { t.hidden = true; action.run(); };
+    t.appendChild(b);
+  }
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+  toastTimer = setTimeout(() => { t.hidden = true; }, action ? 5000 : 2600);
 }
 
 function isHan(ch) {
@@ -480,6 +488,8 @@ function setFingerDraw(on, announce) {
   $('pages').classList.toggle('finger-draw', on);
   $('rowView').classList.toggle('finger-draw', on);
   $('fingerBtn').classList.toggle('sel', on);
+  // Says what a finger does now: write, or scroll (once a stylus is used, only the stylus writes).
+  $('fingerBtn').textContent = on ? '☝ Fingers draw' : '☝ Fingers scroll';
   if (announce) toast(on ? 'Fingers draw — scroll with two fingers' : 'Stylus detected — fingers now scroll, the pen writes');
 }
 
@@ -489,6 +499,7 @@ function setupInk(pages) {
   let tap = null;
   let pan = null;
   let blockTouch = false;
+  const pens = new Set();
 
   const avg = () => {
     let x = 0, y = 0;
@@ -502,12 +513,14 @@ function setupInk(pages) {
     tap = null;
   };
 
-  // With finger scrolling on, a stylus must not scroll the page.
-  pages.addEventListener('touchstart', (e) => {
-    for (const t of e.changedTouches) if (t.touchType === 'stylus') e.preventDefault();
-  }, { passive: false });
+  // With finger scrolling on, a stylus must not scroll the page, or the browser cancels its stroke. Android's WebView
+  // doesn't say which touches are a stylus, but the pen's pointerdown comes before its touchstart and touchmoves.
+  const stopPenScroll = (e) => { if (pens.size) e.preventDefault(); };
+  pages.addEventListener('touchstart', stopPenScroll, { passive: false });
+  pages.addEventListener('touchmove', stopPenScroll, { passive: false });
 
   pages.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'pen') pens.add(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (!state.fingerDraw) return;
@@ -569,6 +582,7 @@ function setupInk(pages) {
   });
 
   const end = (e, cancelled) => {
+    pens.delete(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
       if (touches.size < 2) pan = touches.size ? avg() : null;
@@ -630,7 +644,7 @@ function clearScreen() {
   state.ink[page] = [];
   redrawInk(page);
   saveInkSoon(page);
-  toast('Cleared — tap ↶ to undo');
+  toast('Cleared', { label: 'Undo', run: undo });
 }
 
 // ---------------------------------------------------------------- speech & language
@@ -763,6 +777,7 @@ async function renderLists() {
       .filter((e) => filter === 'all' || (filter === 'words' ? Array.from(e.text).length > 1 : Array.from(e.text).length === 1))
       .sort((a, b) => b.last - a.last)
       .slice(0, 100);
+  renderRecent(h, table);
   const histList = $('histList');
   histList.innerHTML = '';
   for (const e of items) histList.appendChild(listItem(e.text, table, e.last ? e : null));
@@ -773,6 +788,24 @@ async function renderLists() {
   $('bmPractise').hidden = filter !== 'bookmarks' || bm.length === 0;
   $('histClear').hidden = filter === 'bookmarks';
   document.querySelectorAll('.filters button').forEach((b) => b.classList.toggle('sel', b.dataset.filter === filter));
+}
+
+/* The words practised most recently, as chips under the practice box: one tap practises one again. */
+function renderRecent(h, table) {
+  const recent = Object.values(h).sort((a, b) => b.last - a.last).slice(0, 8);
+  const out = $('recentChips');
+  out.textContent = '';
+  for (const e of recent) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'recent-chip';
+    chip.innerHTML = '<span class="rc-word"></span><span class="rc-roman"></span>';
+    chip.querySelector('.rc-word').textContent = e.text;
+    chip.querySelector('.rc-roman').textContent = romanOfText(e.text, table);
+    chip.onclick = () => practiseText(e.text, e.text, false);
+    out.appendChild(chip);
+  }
+  $('recentRow').hidden = recent.length === 0;
 }
 
 function setupLists() {
@@ -800,6 +833,7 @@ function setLang(lang) {
   store.set('lang', lang);
   document.querySelectorAll('input[name=lang], input[name=lang2]').forEach((r) => { r.checked = r.value === lang; });
   document.querySelectorAll('.romanName').forEach((n) => { n.textContent = romanName(); });
+  if ($('optSummary')) showOptSummary();
   if (Native && Native.setLanguage) Native.setLanguage(lang);
   if (!$('sheet').hidden && state.ws) renderPages();
   if (!$('practice').hidden) updatePracticeTitle();
@@ -1089,8 +1123,40 @@ function migrateSavedWorksheets() {
   store.del('worksheets');
 }
 
+/* The worksheet options in the form: set from the last worksheet's, and summed up next to "Worksheet options". */
+function formOpts() {
+  return {
+    size: document.querySelector('input[name=size]:checked').value,
+    grid: document.querySelector('input[name=grid]:checked').value,
+    strokes: $('fStrokes').checked,
+    roman: $('fRoman').checked,
+    name: $('fName').checked,
+  };
+}
+
+function showOptSummary() {
+  const o = formOpts();
+  const bits = [{ large: 'Large', medium: 'Medium', small: 'Small' }[o.size], { mi: '米', tian: '田', none: 'no guide lines' }[o.grid]];
+  if (o.strokes) bits.push('stroke order');
+  if (o.roman) bits.push(romanName());
+  if (o.name) bits.push('姓名');
+  $('optSummary').textContent = '— ' + bits.join(' · ');
+}
+
+function setupOptions() {
+  const o = Object.assign({}, DEFAULT_OPTS, store.get('lastOpts', {}));
+  document.querySelectorAll('input[name=size]').forEach((r) => { r.checked = r.value === o.size; });
+  document.querySelectorAll('input[name=grid]').forEach((r) => { r.checked = r.value === o.grid; });
+  $('fStrokes').checked = o.strokes !== false;
+  $('fRoman').checked = o.roman !== false;
+  $('fName').checked = o.name !== false;
+  $('wsOptions').addEventListener('change', showOptSummary);
+  showOptSummary();
+}
+
 function setupHome() {
   $('homeBack').onclick = () => { if (Native && Native.close) Native.close(); };
+  setupOptions();
   $('newForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const words = Core.practiceWords($('fChars').value);
@@ -1103,13 +1169,7 @@ function setupHome() {
       return;
     }
     err.hidden = true;
-    const ws = createWorksheet('', chars, words, {
-      size: document.querySelector('input[name=size]:checked').value,
-      grid: document.querySelector('input[name=grid]:checked').value,
-      strokes: $('fStrokes').checked,
-      roman: $('fRoman').checked,
-      name: $('fName').checked,
-    });
+    const ws = createWorksheet('', chars, words, formOpts());
     $('fChars').value = '';
     renderTranslations();
     openSheet(ws);
@@ -1275,7 +1335,9 @@ function renderQuizCard() {
     remove.onclick = () => { store.set('quiz', quizItems().filter((x) => x !== t)); renderQuizCard(); };
     out.appendChild(chip);
   }
-  $('quizEmpty').hidden = items.length > 0;
+  // Until something is added, a one-line tip says how, instead of the whole card.
+  $('quizCard').hidden = items.length === 0;
+  $('quizTip').hidden = items.length > 0;
   $('quizStart').hidden = items.length === 0;
   $('quizClear').hidden = items.length === 0;
 }
@@ -1786,25 +1848,42 @@ function setZoom(z) {
 }
 
 function updateTools() {
-  document.querySelectorAll('button.pen').forEach((b) => {
-    b.classList.toggle('sel', state.tool === 'pen' && b.dataset.color === state.color);
-    const dot = b.querySelector('i');
-    const px = 10 + state.size * 5;
-    dot.style.width = dot.style.height = px + 'px';
+  document.querySelectorAll('#colorTray button.pen').forEach((b) => {
+    b.classList.toggle('sel', b.dataset.color === state.color);
   });
+  // The pen button shows the pen's colour, and its size by the dot's size.
+  const pen = $('penBtn');
+  pen.classList.toggle('sel', state.tool === 'pen');
+  const dot = pen.querySelector('i');
+  const px = 10 + state.size * 5;
+  dot.style.width = dot.style.height = px + 'px';
+  dot.style.background = state.color;
   $('eraserBtn').classList.toggle('sel', state.tool === 'eraser');
+}
+
+/* The pen colours open under the pen button; choosing one (or tapping anywhere else) closes them. */
+function toggleColorTray() {
+  const tray = $('colorTray');
+  if (!tray.hidden) { tray.hidden = true; return; }
+  const r = $('penBtn').getBoundingClientRect();
+  tray.style.top = (r.bottom + 6) + 'px';
+  tray.style.left = Math.max(8, Math.min(r.left, innerWidth - 200)) + 'px';
+  tray.hidden = false;
 }
 
 function setupSheet() {
   $('sheetBack').onclick = () => {
     if (state.autoStarted && Native && Native.close) { saveInk(); Native.close(); } else closeSheet();
   };
-  document.querySelectorAll('button.pen').forEach((b) => {
-    b.onclick = () => { state.color = b.dataset.color; state.tool = 'pen'; updateTools(); };
+  $('penBtn').onclick = (e) => { e.stopPropagation(); toggleColorTray(); };
+  document.querySelectorAll('#colorTray button.pen').forEach((b) => {
+    b.onclick = () => { state.color = b.dataset.color; state.tool = 'pen'; $('colorTray').hidden = true; updateTools(); };
   });
+  document.addEventListener('pointerdown', (e) => {
+    if (!$('colorTray').hidden && !e.target.closest('#colorTray, #penBtn')) $('colorTray').hidden = true;
+  }, true);
   $('sizeBtn').onclick = () => { state.size = (state.size + 1) % PEN_SIZES.length; state.tool = 'pen'; updateTools(); };
   $('eraserBtn').onclick = () => { state.tool = state.tool === 'eraser' ? 'pen' : 'eraser'; updateTools(); };
-  $('undoBtn').onclick = undo;
   $('clearBtn').onclick = clearScreen;
   $('fingerBtn').onclick = () => setFingerDraw(!state.fingerDraw, true);
   $('zoomIn').onclick = () => setZoom(state.zoom * 1.25);

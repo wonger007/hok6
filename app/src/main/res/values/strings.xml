@@ -43,8 +43,8 @@
     <string name="practise_button">Practice (%1$d)</string>
     <string name="select_all">Select all</string>
     <string name="practise_no_chinese">The selection has no Chinese characters</string>
-    <string name="practise_mode">Practice mode (tap a character to practice writing it)</string>
-    <string name="practise_on_hint">Practice mode: tap a character to practice writing it</string>
+    <string name="practise_mode">Practice selector (tap a character to practice writing it)</string>
+    <string name="practise_on_hint">Practice selector: tap a character to practice writing it. Tap the pen to write again.</string>
     <string name="practise_miss">Tap right on a Chinese character</string>
     <string name="share_worksheet">Share worksheet</string>
     <string name="share_failed">Couldn\'t make the PDF</string>
@@ -99,6 +99,8 @@
     <string name="saved_as">Saved %1$s</string>
     <string name="save_failed">Couldn\'t save: %1$s</string>
     <string name="practice">Practice</string>
+    <string name="practice_selector">Practice selector</string>
+    <string name="pen_colour">Pen colour</string>
     <string name="quiz_button">Add to quiz (%1$d)</string>
     <string name="quiz_added">Added %1$d to the quiz (%2$d in it now). Open Writing practice → Quiz.</string>
     <string name="quiz_already">Already in the quiz</string>

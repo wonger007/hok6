@@ -9,12 +9,13 @@ copies the book in test/ to Download/StudyBookCheck on the device, and then chec
   1. the chapters are listed in natural order (Chapter_2 before Chapter_10)
   2. a chapter lists all its files
   3. a PDF opens and shows its pages
-  4. Practice writing lists the characters on the page and opens writing practice for one
+  4. Practice selector: tapping a character on the page lists the page's characters and opens writing practice
   5. the practice panel shows that character's stroke order (from the bundled stroke data)
   6. Export → Print / Save as PDF produces a US Letter PDF
   7. Export → Share PDF opens Android's share menu with a US Letter PDF drawn as lines and text (not a picture)
   8. writing on a worksheet is kept in app storage when the word is practiced again; Clear erases it and Undo restores it
-  9. typing English ("thank you") suggests Chinese words
+  9. a stylus stroke on a worksheet is drawn (not taken as scrolling)
+ 10. typing English ("thank you") suggests Chinese words
 
 Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
 
@@ -458,13 +459,37 @@ def main():
     practised = {}
 
     def practise_from_pdf():
-        device.tap(r"writing practice")
-        device.wait_for(r"practice writing")
+        # Practice selector on, then tap a character of the first page's title (centred near the top of the page).
+        device.tap(r"practice selector.*")
+        time.sleep(1)
+        xml = device.shell("cat /sdcard/sbcheck-ui.xml", check=False)
+        frame = next((n for n in ET.fromstring(xml).iter("node") if n.get("resource-id", "").endswith("/pdf_frame")), None)
+        if frame is None:
+            raise Failed("the PDF isn't on screen")
+        left, top, right, _ = map(int, re.findall(r"\d+", frame.get("bounds")))
+        width = right - left
+        for dy in (0.075, 0.07, 0.08, 0.065, 0.085):
+            for dx in (0.48, 0.45, 0.51):
+                device.shell(f"input tap {left + int(dx * width)} {top + int(dy * width)}")
+                time.sleep(2)
+                if device.find(r"practice writing"):
+                    break
+            else:
+                continue
+            break
+        else:
+            raise Failed("tapping the page title in Practice selector mode didn't open the character list")
         chips = [n for n in device.nodes() if len(n[0]) == 1 and re.match(r"[㐀-鿿\U00020000-\U0003ffff]", n[0])]
         if not chips:
             raise Failed("no Chinese characters listed for the page")
-        chip = next((c for c in chips if c[0] not in "姓名日期"), chips[0])
-        device.shell(f"input tap {chip[2]} {chip[3]}")
+        # The character tapped on the page is already chosen.
+        xml = device.shell("cat /sdcard/sbcheck-ui.xml", check=False)
+        ticked = [n.get("text") for n in ET.fromstring(xml).iter("node")
+                  if n.get("checked") == "true" and len(n.get("text", "")) == 1]
+        chip = next((c for c in chips if c[0] in ticked), None)
+        if chip is None:
+            chip = next((c for c in chips if c[0] not in "姓名日期"), chips[0])
+            device.shell(f"input tap {chip[2]} {chip[3]}")
         device.tap(r"practice \(1\)")
         end = time.time() + 90
         while "TrainingActivity" not in device.focused():
@@ -499,16 +524,23 @@ def main():
         devtools_eval(device, "(()=>{ closePractice(); document.getElementById('printBtn').click();"
                               " document.querySelector('input[name=exportInk][value=blank]').checked = true;"
                               " setTimeout(()=>document.querySelector('[data-action=print]').click(), 300); return 1 })()")
-        device.wait_for(r"save as pdf|select a printer|all printers.*", timeout=60)
+        device.wait_for(r"save as pdf|select (a )?printer|all printers.*", timeout=60)
         if not device.find(r"save as pdf"):
-            device.tap(r"select a printer|.*printer.*")
+            device.tap(r"select (a )?printer|.*printer.*")
             device.tap(r"save as pdf")
         device.tap(r"save to pdf", timeout=60)
-        device.tap(r"save", timeout=60)
+        # Samsung asks for a folder in My Files ("Select folder" … Done) instead of Android's Save screen.
+        node = device.wait_for(r"save|select folder", timeout=60)
+        if re.fullmatch(r"select folder", node[0] or node[1], re.I):
+            device.tap(r"download")
+            time.sleep(1)
+            device.tap(r"done")
+        else:
+            device.tap(r"save", timeout=60)
         end = time.time() + 60
         newest = ""
         while time.time() < end:
-            newest = device.shell(f"find /sdcard/Download /sdcard/Documents -name '*.pdf' -newer {DEVICE_BOOK}/.check-started 2>/dev/null",
+            newest = device.shell(f"find /sdcard/Download /sdcard/Documents -iname '*.pdf' -newer {DEVICE_BOOK}/.check-started 2>/dev/null",
                                   check=False).strip().splitlines()
             if newest:
                 break
@@ -576,7 +608,7 @@ def main():
                                       " closeSheet(); await openSheet(ws); const kept=(state.ink[p]||[]).length;"
                                       " document.getElementById('clearBtn').click();"
                                       " const left=(state.ink[p]||[]).length+pageSvg(p).querySelectorAll('.ink path').length;"
-                                      " document.getElementById('undoBtn').click(); const back=pageSvg(p).querySelectorAll('.ink path').length;"
+                                      " undo(); const back=pageSvg(p).querySelectorAll('.ink path').length;"
                                       " document.getElementById('clearBtn').click(); saveInk();"
                                       " return {stored, kept, left, back, gone: Native.storeGet(inkKey(p))==null} })()", timeout=60)
         if not value or not value["stored"]:
@@ -586,6 +618,27 @@ def main():
         if value["left"] != 0 or value["back"] < 1 or not value["gone"]:
             raise Failed(f"Clear / Undo didn't work: {value}")
         return f"kept {value['kept']} stroke(s) after reopening; Clear erased them, Undo brought them back"
+
+    def stylus_writes():
+        # A stylus stroke in an empty writing square is drawn and kept: it must not scroll the page instead.
+        spot = devtools_eval(device, "(()=>{ const pages=document.getElementById('pages');"
+                                     " const svg=pageSvg(state.row); let r=svg.getBoundingClientRect();"
+                                     " pages.scrollTop += r.top + 0.75*r.height - innerHeight/2; r=svg.getBoundingClientRect();"
+                                     " return {x: r.left + 0.3*r.width, y: r.top + 0.75*r.height, w: r.width, dpr: devicePixelRatio,"
+                                     " before: (state.ink[state.row]||[]).length} })()")
+        device.shell("uiautomator dump /sdcard/sbcheck-ui.xml", check=False, timeout=60)
+        xml = device.shell("cat /sdcard/sbcheck-ui.xml", check=False)
+        web = next((n for n in ET.fromstring(xml).iter("node") if n.get("class") == "android.webkit.WebView"), None)
+        left, top = (map(int, re.findall(r"\d+", web.get("bounds"))[:2])) if web is not None else (0, 0)
+        x1, y1 = left + int(spot["x"] * spot["dpr"]), top + int(spot["y"] * spot["dpr"])
+        x2, y2 = x1 + int(0.15 * spot["w"] * spot["dpr"]), y1 + int(0.03 * spot["w"] * spot["dpr"])
+        device.shell(f"input stylus swipe {x1} {y1} {x2} {y2} 500")
+        time.sleep(1.5)
+        after = devtools_eval(device, "(state.ink[state.row]||[]).length")
+        devtools_eval(device, "(()=>{ undo(); saveInk(); return 1 })()")
+        if after != spot["before"] + 1:
+            raise Failed(f"a stylus stroke wasn't drawn ({spot['before']} strokes before, {after} after)")
+        return "a stylus stroke in a writing square was drawn and kept"
 
     def english_lookup():
         value = devtools_eval(device, "(async()=>{ if(!document.getElementById('sheet').hidden) closeSheet();"
@@ -606,6 +659,7 @@ def main():
           and check("Worksheet saves as a PDF", results, device, save_pdf)
           and check("Worksheet shares as a PDF", results, device, share_pdf)
           and check("Writing is kept; Clear erases it", results, device, writing_kept_and_cleared)
+          and check("A stylus writes on the worksheet", results, device, stylus_writes)
           and check("English is looked up", results, device, english_lookup))
 
     device.shell(f"am force-stop {PACKAGE}", check=False)

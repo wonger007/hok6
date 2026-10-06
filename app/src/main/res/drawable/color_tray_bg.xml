@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pen colours that open under the pen button. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="12dp" />
+    <solid android:color="#FF303030" />
+    <stroke android:width="1.5dp" android:color="#B3FFFFFF" />
+</shape>

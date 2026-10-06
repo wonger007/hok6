@@ -53,13 +53,24 @@ button:disabled { opacity: 0.4; }
 }
 .bar h1 { font-size: 20px; font-weight: 600; margin: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
 .bar .spacer, .spacer { flex: 1; }
-.bar .group { display: flex; align-items: center; background: rgba(255,255,255,0.14); border-radius: 999px; padding: 0 4px; }
-.bar .group button.icon.sel, .bar .group button.pen.sel { background: rgba(255,255,255,0.35); }
-.bar button.primary { background: #fff; color: var(--brand); border-color: #fff; font-weight: 600; }
-.bar button.clear-btn {
-  border: none; background: #fff; color: var(--brand); font-weight: 600;
-  min-height: 36px; padding: 0 14px; margin: 0 4px;
+.bar .group { display: flex; align-items: center; gap: 6px; }
+/* Title bar tools: outlined, so they read as buttons; the chosen one is filled lightly with a thicker outline. */
+.bar button.tbtn {
+  min-width: 44px; height: 44px; min-height: 0; padding: 0 8px; border-radius: 8px;
+  border: 1.5px solid rgba(255,255,255,0.7); background: transparent; color: #fff; font-size: 20px; line-height: 1;
 }
+.bar button.tbtn.sel { background: rgba(255,255,255,0.3); border: 2.5px solid #fff; }
+.bar button.tbtn.clear-btn, .bar button.tbtn.finger-btn { font-size: 15px; font-weight: 600; padding: 0 12px; }
+.bar button.pen-btn i { display: inline-block; border-radius: 50%; border: 2px solid #fff; vertical-align: middle; }
+.color-tray {
+  position: fixed; z-index: 15; display: flex; gap: 8px; padding: 8px;
+  background: #303030; border: 1.5px solid rgba(255,255,255,0.7); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.color-tray[hidden] { display: none; }
+.color-tray button.pen { width: 52px; height: 52px; min-height: 0; border-radius: 8px; border: 1.5px solid rgba(255,255,255,0.7); }
+.color-tray button.pen.sel { background: rgba(255,255,255,0.3); border: 2.5px solid #fff; }
+.color-tray button.pen i { width: 26px; height: 26px; }
+.bar button.primary { background: #fff; color: var(--brand); border-color: #fff; font-weight: 600; }
 button.pen { border: none; background: transparent; min-width: 44px; padding: 0; }
 button.pen i { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; vertical-align: middle; }
 
@@ -125,6 +136,21 @@ svg.page .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; 
 /* English → Chinese suggestions */
 .translate { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: -6px 0 16px; background: rgba(198, 40, 40, 0.04); }
 .translate-head { font-size: 14px; margin-bottom: 6px; }
+.recent { margin: -6px 0 12px; }
+.recent > .muted { font-size: 14px; }
+.recent-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+button.recent-chip { display: flex; flex-direction: column; align-items: flex-start; min-height: 0; padding: 4px 12px; border-radius: 12px; }
+.rc-word { font-size: 20px; font-family: "Noto Serif CJK HK", serif; }
+.rc-roman { font-size: 12px; color: var(--brand); }
+details.options { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.options summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+details.options summary .muted { font-weight: normal; font-size: 14px; }
+details.options[open] summary { margin-bottom: 10px; }
+.quiz-tip { grid-column: 1 / -1; margin: 0; padding: 12px 16px; background: var(--card); border-radius: 16px; font-size: 15px; }
+.tr-box { margin: 0 0 16px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.tr-box h3 { margin: 0 0 4px; font-size: 15px; }
+.tr-tap { font-weight: normal; color: var(--muted); }
+.tr-box #trHint { margin: 0; font-size: 14px; }
 .tr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
 .tr-phrase { width: 100%; font-weight: 600; font-size: 14px; }
 .tr-chip { display: flex; flex-direction: column; align-items: flex-start; text-align: left; border-radius: 12px; padding: 6px 12px; min-height: 0; max-width: 220px; }
@@ -183,6 +209,8 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
   .bar { padding: 4px 6px; gap: 4px; }
   .bar h1 { font-size: 17px; max-width: 45vw; margin: 0 4px; }
   .bar button.primary { padding: 8px 12px; }
+  .bar button.tbtn { min-width: 40px; height: 40px; font-size: 18px; }
+  .bar button.tbtn.clear-btn, .bar button.tbtn.finger-btn { font-size: 13px; padding: 0 8px; }
   .lang span { padding: 6px 10px; font-size: 13px; }
   .hint { display: none; }
   .home-main { padding: 10px; }
@@ -239,7 +267,7 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
 .q-summary ul { padding: 0; }
 
 /* Handwriting pad */
-#handBtn { align-self: flex-start; }
+#handBtn { align-self: flex-start; margin-bottom: 10px; }
 .hand-card { display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(560px, 100%); }
 .hand-head { display: flex; align-items: center; width: 100%; }
 .hand-head h2 { margin: 0; }
@@ -259,6 +287,10 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
   position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%);
   background: rgba(33,33,33,0.92); color: #fff; padding: 12px 20px; border-radius: 999px; z-index: 20;
   max-width: 90vw; text-align: center;
+}
+.toast button.toast-action {
+  margin-left: 14px; min-height: 0; padding: 4px 12px; border: 1.5px solid #fff; background: transparent; color: #fff;
+  font-weight: 600;
 }
 
 /* Short landscape screens: practice panel side by side (after the panel's normal rules, so it wins) */

@@ -28,35 +28,49 @@
       <h2>New worksheet</h2>
       <label class="field">Characters, words or English to practice
         <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 — or type English: thank you, good morning"></textarea>
-        <small>One page per word (separate words with spaces): stroke order, a row to trace, then rows to write it. English is looked up in the English → Chinese box.</small>
+        <small>One page per word (separate words with spaces): stroke order, a row to trace, then rows to write it.</small>
       </label>
+      <div id="recentRow" class="recent" hidden>
+        <span class="muted">Recent — tap to practice again:</span>
+        <div id="recentChips" class="recent-chips"></div>
+      </div>
       <button type="button" id="handBtn" hidden>✍ Write by hand (stylus)</button>
+      <!-- English typed in the box above is looked up here, right under it, so it's clear the words are to tap. -->
+      <div id="translateBox" class="tr-box">
+        <h3>English → <span id="trLang">廣東話 Cantonese</span> <span class="tr-tap">— tap a word to use it</span></h3>
+        <p id="trHint" class="muted">Type English above (e.g. <i>thank you, good morning</i>) and Chinese words appear here. Tap one to use it.</p>
+        <div id="trResults"></div>
+      </div>
 
-      <fieldset class="field">
-        <legend>Box size</legend>
-        <label class="check"><input type="radio" name="size" value="large" checked> Large — 27 mm, for young children (like the K1 homework)</label>
-        <label class="check"><input type="radio" name="size" value="medium"> Medium — 20 mm</label>
-        <label class="check"><input type="radio" name="size" value="small"> Small — 17 mm</label>
-      </fieldset>
-      <fieldset class="field">
-        <legend>Square guide lines</legend>
-        <label class="check"><input type="radio" name="grid" value="mi" checked> 米 (diagonals)</label>
-        <label class="check"><input type="radio" name="grid" value="tian"> 田 (cross)</label>
-        <label class="check"><input type="radio" name="grid" value="none"> None</label>
-      </fieldset>
-      <label class="check"><input id="fStrokes" type="checkbox" checked> Start with the stroke order</label>
-      <label class="check"><input id="fRoman" type="checkbox" checked> Show <span class="romanName">Jyutping</span> under the word</label>
-      <label class="check"><input id="fName" type="checkbox" checked> Write “姓名：” (name) on top</label>
       <button type="submit" class="primary">Create worksheet</button>
       <p id="formError" class="error" hidden></p>
+      <!-- Kept from the last worksheet; folded away so the button above is easy to find. -->
+      <details id="wsOptions" class="options">
+        <summary>Worksheet options <span id="optSummary" class="muted"></span></summary>
+        <fieldset class="field">
+          <legend>Box size</legend>
+          <label class="check"><input type="radio" name="size" value="large" checked> Large — 27 mm, for young children (like the K1 homework)</label>
+          <label class="check"><input type="radio" name="size" value="medium"> Medium — 20 mm</label>
+          <label class="check"><input type="radio" name="size" value="small"> Small — 17 mm</label>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Square guide lines</legend>
+          <label class="check"><input type="radio" name="grid" value="mi" checked> 米 (diagonals)</label>
+          <label class="check"><input type="radio" name="grid" value="tian"> 田 (cross)</label>
+          <label class="check"><input type="radio" name="grid" value="none"> None</label>
+        </fieldset>
+        <label class="check"><input id="fStrokes" type="checkbox" checked> Start with the stroke order</label>
+        <label class="check"><input id="fRoman" type="checkbox" checked> Show <span class="romanName">Jyutping</span> under the word</label>
+        <label class="check"><input id="fName" type="checkbox" checked> Write “姓名：” (name) on top</label>
+      </details>
     </form>
 
-    <section class="card" id="quizCard">
+    <p id="quizTip" class="muted quiz-tip" hidden>📝 <b>Quiz</b>: on a homework page, tap <b>Practice selector</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>. The quiz appears here.</p>
+    <section class="card" id="quizCard" hidden>
       <div class="card-head">
         <h2>Quiz</h2>
         <button id="quizClear" class="plain small" hidden>Remove all</button>
       </div>
-      <p id="quizEmpty" class="muted">Nothing to quiz yet. On a homework page, tap <b>Practice</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>.</p>
       <div id="quizItems" class="quiz-items"></div>
       <div id="quizStart" class="quiz-start" hidden>
         <fieldset class="field">
@@ -82,14 +96,6 @@
           <button type="button" class="primary" id="wqStart">Start written quiz</button>
         </fieldset>
       </div>
-    </section>
-
-    <section class="card" id="translateBox">
-      <div class="card-head">
-        <h2>English → <span id="trLang">廣東話 Cantonese</span></h2>
-      </div>
-      <p id="trHint" class="muted">Type English in the practice box (e.g. <i>thank you, good morning</i>) and matching Chinese words appear here. Tap one to use it.</p>
-      <div id="trResults"></div>
     </section>
 
     <section class="card">
@@ -154,19 +160,16 @@
     <h1 id="sheetTitle"></h1>
     <div class="spacer"></div>
     <div class="group">
-      <button class="pen sel" data-color="#212121" aria-label="Black pen"><i style="background:#212121"></i></button>
-      <button class="pen" data-color="#1E88E5" aria-label="Blue pen"><i style="background:#1E88E5"></i></button>
-      <button class="pen" data-color="#E53935" aria-label="Red pen"><i style="background:#E53935"></i></button>
-      <button class="icon" id="sizeBtn" aria-label="Pen size">◍</button>
-      <button class="icon" id="eraserBtn" aria-label="Eraser">⌫</button>
-      <button class="icon" id="undoBtn" aria-label="Undo">↶</button>
-      <button class="clear-btn" id="clearBtn" aria-label="Clear: erase all writing on screen">🗑 Clear</button>
+      <button class="tbtn pen-btn" id="penBtn" aria-label="Pen colour"><i></i></button>
+      <button class="tbtn" id="sizeBtn" aria-label="Pen size">◍</button>
+      <button class="tbtn" id="eraserBtn" aria-label="Eraser">⌫</button>
+      <button class="tbtn clear-btn" id="clearBtn" aria-label="Clear: erase all writing on screen">🗑 Clear</button>
     </div>
     <div class="group">
-      <button class="icon" id="viewBtn" aria-label="Show whole pages">📄</button>
-      <button class="icon" id="fingerBtn" aria-label="Finger draws">☝</button>
-      <button class="icon page-only" id="zoomOut" aria-label="Zoom out">－</button>
-      <button class="icon page-only" id="zoomIn" aria-label="Zoom in">＋</button>
+      <button class="tbtn" id="viewBtn" aria-label="Show whole pages">📄</button>
+      <button class="tbtn finger-btn" id="fingerBtn" aria-label="Fingers draw or scroll: tap to switch">☝ Fingers draw</button>
+      <button class="tbtn page-only" id="zoomOut" aria-label="Zoom out">－</button>
+      <button class="tbtn page-only" id="zoomIn" aria-label="Zoom in">＋</button>
     </div>
     <div class="lang small" role="radiogroup" aria-label="Language">
       <label><input type="radio" name="lang2" value="yue" checked><span>粵</span></label>
@@ -302,6 +305,12 @@
   </div>
 </div>
 
+<!-- The pen colours, opening under the pen button. -->
+<div id="colorTray" class="color-tray" hidden>
+  <button class="pen" data-color="#212121" aria-label="Black pen"><i style="background:#212121"></i></button>
+  <button class="pen" data-color="#1E88E5" aria-label="Blue pen"><i style="background:#1E88E5"></i></button>
+  <button class="pen" data-color="#E53935" aria-label="Red pen"><i style="background:#E53935"></i></button>
+</div>
 <div id="toast" class="toast" hidden></div>
 </body>
 </html>

@@ -58,25 +58,29 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 
 - **Write** straight on a PDF or Word page with a finger or stylus. Scroll and zoom with two fingers (once you use a
   stylus, fingers only scroll).
-- Use the title bar to change the pen colour and size, erase, **Undo**, **Clear** the screen, or zoom.
+- Use the title bar to change the pen colour (tap the pen to open the colours) and size, erase, **Clear** the screen
+  (the message that appears offers **Undo**), or zoom.
 - Your writing is saved automatically for each page.
 - When it's finished, ⋮ → **Save a copy with my tracing…** saves a new PDF with your writing on it, named e.g.
   `completed_Homework.pdf`, in the same chapter folder (the original isn't changed).
 
 ### 5. Practice writing characters
 
-- On a page, tap **Practice**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
+- On a page, tap **Practice selector**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
   worksheet with stroke order, a row to trace and rows to write in. Tap a pen to go back to writing on the page.
 - Or tap **Writing practice** on the main screen and type characters, words or English (e.g. *thank you*), or tap
-  **✍ Write by hand** to write a character with a stylus. Then tap **Create worksheet**.
+  **✍ Write by hand** to write a character with a stylus. English shows Chinese words right under the box; tap one to
+  use it. Then tap **Create worksheet**. Box size, guide lines and the rest are under **Worksheet options** (kept from
+  your last worksheet), and the words you practiced last are chips under the box: tap one to practice it again.
 - On a worksheet, tap a stroke-order square to watch the strokes and try **✍ Write it**; tap 🔊 to hear the word.
-  **Export** prints it or shares it as a PDF.
+  The title bar works like a homework page's: tap the pen for the colours, **Clear** (with Undo in the message), and
+  **☝ Fingers draw / scroll** to choose whether a finger writes. **Export** prints it or shares it as a PDF.
 - Switch between **廣東話 Cantonese** and **普通話 Mandarin** at the top.
 
 ### 6. Quiz yourself
 
-1. On a page, tap **Practice**, tap a character, choose the ones to learn and tap **Add to quiz**.
-2. Open **Writing practice** and find the **Quiz** card:
+1. On a page, tap **Practice selector**, tap a character, choose the ones to learn and tap **Add to quiz**.
+2. Open **Writing practice** and find the **Quiz** card (it appears once something is in the quiz):
    - **Flash cards**: choose Chinese → meaning, English → Chinese or Sound → Chinese, tap **Start flash cards**, then
      **Show answer** and mark **Knew it** or **Again**.
    - **Written quiz**: choose the prompt (English meaning, the Chinese character, which can hide after a few seconds,
@@ -108,17 +112,23 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 - **Word (.docx)** shown as text in the app, keeping headings, bold/italic, tables and ruby (pinyin/jyutping) annotations.
 - **Audio** (mp3, m4a, wav, …) as a chapter playlist with a player bar, speed control, repeat-one and lock-screen controls.
 - **Tracing** on PDFs and Word documents with finger or stylus, on as soon as a file opens (two fingers scroll and
-  zoom; once a stylus is used, only the stylus writes). The pens, size, eraser, undo, **Clear** and zoom are in the title
-  bar, so nothing covers the page (**Clear** erases everything on screen at once); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
+  zoom; once a stylus is used, only the stylus writes). The pen (tap it for the colours), size, eraser, **Clear** and zoom
+  are outlined buttons in the title bar, so nothing covers the page (**Clear** erases everything on screen at once, with
+  Undo in the message that follows); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
   the pages (as sharp lines) into the chapter folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
-- **Practice** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen goes back to writing.
+- **Practice selector** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
 - **Writing practice** worksheets:
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;
   - stroke order shown above each row, plus stroke-order animation, step-by-step strokes and a writing quiz for each character;
   - Cantonese (Jyutping, Cantonese voice) or Mandarin (Pinyin, Mandarin voice);
   - pronunciation: hear each character and the word it belongs to, at normal or slow speed, with tone names (e.g. nei5 · tone 5, low rising);
-  - type English to get Chinese words (Cantonese or Mandarin, following the language switch), from an offline dictionary;
-  - **Quiz**: on a homework page, tap **Practice**, choose characters and tap **Add to quiz**. Writing practice → Quiz
+  - type English to get Chinese words (Cantonese or Mandarin, following the language switch), from an offline
+    dictionary, shown right under the practice box;
+  - the words practiced last as one-tap chips under the practice box; worksheet options folded under the Create button
+    and kept from the last worksheet;
+  - outlined title bar tools, as on homework pages: the pen opens its colours, size, eraser, **Clear** (Undo in the
+    message), **☝ Fingers draw / scroll**, zoom;
+  - **Quiz**: on a homework page, tap **Practice selector**, tap a character, choose characters and tap **Add to quiz**. Writing practice → Quiz
     then offers **flash cards** (Chinese → meaning, English → Chinese, or sound → Chinese; you mark Knew it / Again)
     or a **written quiz**: write the character from memory in a blank box, checked stroke by stroke (a hint after 3
     misses, or **Show me**), prompted by its English meaning, its pronunciation, or the character itself, shown at the
@@ -129,7 +139,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   - history of practiced words and characters (with quiz results) and bookmarks in one list, each one tap away from a fresh
     worksheet;
   - your writing is kept for each word (the last 60 words written on), so it's still there when you practice that word
-    again; **Clear** erases everything on screen (Undo brings it back);
+    again; **Clear** erases everything on screen (the message offers Undo);
   - export: print, or share a PDF (US Letter, 8.5 × 11 in, sharp lines and real text) with another app such as Gmail or
     WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).

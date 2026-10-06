@@ -17,6 +17,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -70,7 +72,7 @@ class ChapterActivity : AppCompatActivity() {
     /** The tracing and zoom tools in the title bar, shown while a file is open. */
     private lateinit var fileTools: View
     private lateinit var practiseButton: TextView
-    private lateinit var colorButtons: List<ImageButton>
+    private lateinit var penButton: ImageButton
     private lateinit var eraserButton: ImageButton
     private lateinit var ink: Ink
     private lateinit var pdf: PdfViewer
@@ -109,7 +111,7 @@ class ChapterActivity : AppCompatActivity() {
         fileTools = findViewById(R.id.file_tools)
         practiseButton = findViewById(R.id.practise_mode)
         eraserButton = findViewById(R.id.ink_eraser)
-        colorButtons = listOf(R.id.ink_red, R.id.ink_blue, R.id.ink_black).map { findViewById(it) }
+        penButton = findViewById(R.id.ink_pen)
         // Files open ready to write on; Practice mode switches tapping to choosing characters instead.
         ink = Ink(this).apply { active = true }
         docxText.surface = InkSurface(docxText, ink) { dy -> docxScroll.scrollBy(0, dy.toInt()) }
@@ -176,6 +178,8 @@ class ChapterActivity : AppCompatActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.open_external).isVisible = current != null
+        // With a file open, the Practice selector does this.
+        menu.findItem(R.id.writing_practice).isVisible = current == null
         menu.findItem(R.id.move_files).isVisible = files.isNotEmpty()
         menu.findItem(R.id.save_traced).isVisible = current?.kind == Kind.PDF
         return super.onPrepareOptionsMenu(menu)
@@ -494,14 +498,7 @@ class ChapterActivity : AppCompatActivity() {
             if (ink.practising) Toast.makeText(this, R.string.practise_on_hint, Toast.LENGTH_SHORT).show()
             updateInkTools()
         }
-        colorButtons.forEachIndexed { i, button ->
-            button.setOnClickListener {
-                ink.color = Ink.PEN_COLORS[i]
-                ink.tool = InkTool.PEN
-                leavePractice()
-                updateInkTools()
-            }
-        }
+        penButton.setOnClickListener { showColours() }
         eraserButton.setOnClickListener {
             ink.tool = if (ink.tool == InkTool.ERASER) InkTool.PEN else InkTool.ERASER
             leavePractice()
@@ -513,9 +510,6 @@ class ChapterActivity : AppCompatActivity() {
             ink.tool = InkTool.PEN
             leavePractice()
             updateInkTools()
-        }
-        findViewById<View>(R.id.ink_undo).setOnClickListener {
-            if (ink.document?.undo() == true) invalidateInk()
         }
         // Clears everything on screen at once (a Word document is one long page); Undo brings it back.
         findViewById<View>(R.id.ink_clear).setOnClickListener {
@@ -540,25 +534,63 @@ class ChapterActivity : AppCompatActivity() {
 
     private fun updateInkTools() {
         // The mode that's on is shown solid; pens and the eraser are ringed when chosen (and not in Practice mode).
-        practiseButton.setBackgroundResource(if (ink.practising) R.drawable.bar_active else 0)
+        practiseButton.setBackgroundResource(if (ink.practising) R.drawable.bar_active else R.drawable.bar_button)
         if (ink.practising) practiseButton.setTextColor(ContextCompat.getColor(this, R.color.brand))
         else practiseButton.setTextColor(barTextColors)
         val writing = !ink.practising
-        colorButtons.forEachIndexed { i, button ->
-            val selected = writing && ink.tool == InkTool.PEN && ink.color == Ink.PEN_COLORS[i]
-            button.setBackgroundResource(if (selected) R.drawable.bar_selected else 0)
-            // A white ring keeps the red dot visible on the red bar; the dot's size shows the pen size.
-            button.imageTintList = null // the bar's icon colour would turn every dot white
-            button.setImageDrawable(GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Ink.PEN_COLORS[i] or 0xFF000000.toInt())
-                setStroke((2 * ink.density).toInt(), Color.WHITE)
-            })
-            val pad = ((15 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
-            button.scaleType = ImageView.ScaleType.FIT_CENTER
-            button.setPadding(pad, pad, pad, pad)
+        penButton.setBackgroundResource(
+            if (writing && ink.tool == InkTool.PEN) R.drawable.bar_selected else R.drawable.bar_button)
+        // The dot shows the pen's colour and size.
+        penButton.imageTintList = null // the bar's icon colour would turn the dot white
+        penButton.setImageDrawable(colourDot(ink.color))
+        val pad = ((14 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
+        penButton.scaleType = ImageView.ScaleType.FIT_CENTER
+        penButton.setPadding(pad, pad, pad, pad)
+        eraserButton.setBackgroundResource(
+            if (writing && ink.tool == InkTool.ERASER) R.drawable.bar_selected else R.drawable.bar_button)
+    }
+
+    /** A pen colour as a dot, ringed in white so the red one shows on the red bar. */
+    private fun colourDot(colour: Int) = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(colour or 0xFF000000.toInt())
+        setStroke((2 * ink.density).toInt(), Color.WHITE)
+    }
+
+    /** The pen colours, opening under the pen button; choosing one goes back to writing with it. */
+    private fun showColours() {
+        val dp = ink.density
+        val tray = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = ContextCompat.getDrawable(this@ChapterActivity, R.drawable.color_tray_bg)
+            val pad = (6 * dp).toInt()
+            setPadding(pad, pad, pad, pad)
         }
-        eraserButton.setBackgroundResource(if (writing && ink.tool == InkTool.ERASER) R.drawable.bar_selected else 0)
+        val popup = PopupWindow(tray, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        popup.elevation = 8 * dp
+        val names = listOf(R.string.pen_red, R.string.pen_blue, R.string.pen_black)
+        Ink.PEN_COLORS.forEachIndexed { i, colour ->
+            tray.addView(ImageButton(this).apply {
+                contentDescription = getString(names[i])
+                setImageDrawable(colourDot(colour))
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                val pad = (10 * dp).toInt()
+                setPadding(pad, pad, pad, pad)
+                setBackgroundResource(
+                    if (ink.tool == InkTool.PEN && ink.color == colour) R.drawable.bar_selected else R.drawable.bar_button)
+                setOnClickListener {
+                    ink.color = colour
+                    ink.tool = InkTool.PEN
+                    leavePractice()
+                    updateInkTools()
+                    popup.dismiss()
+                }
+            }, LinearLayout.LayoutParams((52 * dp).toInt(), (52 * dp).toInt()).apply {
+                val m = (4 * dp).toInt()
+                setMargins(m, m, m, m)
+            })
+        }
+        popup.showAsDropDown(penButton, 0, (6 * dp).toInt())
     }
 
     /** The title bar's text colour (from the layout), for the Practice button when it's off. */

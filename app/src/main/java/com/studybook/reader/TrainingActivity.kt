@@ -135,7 +135,10 @@ class TrainingActivity : AppCompatActivity() {
         engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "speak")
     }
 
-    private fun print(jobName: String) {
+    private fun print(title: String) {
+        // The saved PDF is named after the job. Samsung's Save as PDF treats anything after a dot as the extension
+        // ("K1 Ch.1 Homework" became "K1 Ch.PDF"), so dots become spaces.
+        val jobName = title.replace('.', ' ').replace(Regex("\\s+"), " ").trim().ifEmpty { "worksheet" }
         val printManager = getSystemService(PRINT_SERVICE) as PrintManager
         val inner = web.createPrintDocumentAdapter(jobName)
         // Wrap the adapter so the page can restore itself (e.g. show the writing again) once printing ends.
