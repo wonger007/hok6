@@ -10,6 +10,14 @@
         android:clipToPadding="false"
         android:padding="12dp" />
 
+    <!-- While a folder is being looked into after a tap (slow on some memory cards). -->
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/opening"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/empty"
         android:layout_width="wrap_content"

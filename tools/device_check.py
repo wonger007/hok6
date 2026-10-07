@@ -695,6 +695,107 @@ def main():
             raise Failed(f"pages stretched: {bad} (should be {h / w:.3f} tall per width)")
         return f"{len(after)} pages kept their shape ({h / w:.3f}) after pinching while dragging"
 
+    # ---- tracing on a chapter's PDF
+
+    traced = {}
+
+    def open_pdf_fresh():
+        device.shell(f"am force-stop {PACKAGE}")
+        device.shell(f"am start -n {MAIN}")
+        device.tap(re.escape(chapter))
+        device.tap(re.escape(pdf))
+        device.wait_for(r"\d+ / \d+", timeout=60)
+        time.sleep(1)
+
+    def jump_to(page):
+        device.tap(r"\d+ / \d+")
+        time.sleep(1)
+        device.shell(f"input text {page}")
+        device.tap(r"go")
+        return device.wait_for(rf"{page} / \d+")
+
+    def ink_counts():
+        """Strokes on each page of the open PDF, from its tracing file in the app's storage (readable in the test build)."""
+        name = traced.get("file")
+        if not name:
+            files = [f for f in device.shell(f"run-as {PACKAGE} ls -t files/ink", check=False).split() if f.endswith(".json")]
+            if not files:
+                return {}
+            name = traced["file"] = files[0]
+        text = device.shell(f"run-as {PACKAGE} cat files/ink/{name}", check=False)
+        try:
+            return {int(k): len(v) for k, v in json.loads(text).items()}
+        except ValueError:
+            return {}
+
+    def draw_on_first_page():
+        sw, sh = map(int, device.shell("wm size").split()[-1].split("x"))
+        y = sh * 45 // 100 + 30 * len(traced.get("strokes", []))
+        device.shell(f"input stylus swipe {sw * 3 // 10} {y} {sw * 6 // 10} {y + 40} 400")
+        traced.setdefault("strokes", []).append(y)
+        time.sleep(2)  # tracing is saved a second after each change
+
+    def go_to_page():
+        open_pdf_fresh()
+        count = int(device.wait_for(r"\d+ / \d+")[0].split("/")[1])
+        if count < 2:
+            raise Failed(f"{pdf} has only one page")
+        jump_to(count)
+        jump_to(1)
+        return f"page {count} of {count}, then back to page 1"
+
+    def tracing_kept():
+        draw_on_first_page()
+        first = ink_counts().get(0, 0)
+        draw_on_first_page()
+        second = ink_counts().get(0, 0)
+        if first < 1 or second != first + 1:
+            raise Failed(f"strokes on page 1 went {first} → {second} after drawing one more")
+        traced["count"] = second
+        return f"{second} strokes saved on page 1"
+
+    def clear_and_undo():
+        before = traced["count"]
+        device.tap(r"clear")
+        node = device.wait_for(r"clear tracing\?|clear the tracing on which page\?")
+        if "which" in node[0].lower():
+            device.tap(r"page 1")
+        else:
+            # The dialog's Clear button, below the title bar's Clear.
+            buttons = [n for n in device.nodes() if re.fullmatch(r"clear", n[0], re.I)]
+            confirm = max(buttons, key=lambda n: n[3])
+            device.shell(f"input tap {confirm[2]} {confirm[3]}")
+        time.sleep(1.5)
+        cleared = ink_counts().get(0, 0)
+        device.tap(r"undo", timeout=5)
+        time.sleep(2)
+        back = ink_counts().get(0, 0)
+        if cleared != 0:
+            raise Failed(f"{cleared} strokes left on page 1 after Clear")
+        if back != before:
+            raise Failed(f"Undo brought back {back} of {before} strokes")
+        return f"asked first; {before} strokes cleared, and Undo brought them back"
+
+    def save_with_tracing():
+        base = os.path.splitext(pdf)[0]
+        target = f"{DEVICE_BOOK}/{chapter}/{base}_completed.pdf"
+        device.shell(f"rm -f '{target}'", check=False)
+        device.tap(r"more options")
+        device.tap(r"save a copy with my tracing…")
+        device.tap(re.escape(f"{base}_completed"))
+        device.tap(r"save")
+        end = time.time() + 60
+        size = 0
+        while time.time() < end:
+            size = int(device.shell(f"stat -c %s '{target}' 2>/dev/null", check=False).strip() or 0)
+            if size > 0:
+                break
+            time.sleep(2)
+        device.shell(f"rm -f '{target}'", check=False)
+        if size <= 0:
+            raise Failed(f"{base}_completed.pdf wasn't saved")
+        return f"{base}_completed.pdf ({size // 1024} KB)"
+
     def english_lookup():
         value = devtools_eval(device, "(async()=>{ if(!document.getElementById('sheet').hidden) closeSheet();"
                                       " const f=document.getElementById('fChars'); f.value='thank you';"
@@ -716,7 +817,11 @@ def main():
           and check("Writing is kept; Clear erases it", results, device, writing_kept_and_cleared)
           and check("A stylus writes on the worksheet", results, device, stylus_writes)
           and check("English is looked up", results, device, english_lookup)
-          and check("Zooming while scrolling keeps pages in shape", results, device, zoom_keeps_page_shape))
+          and check("Zooming while scrolling keeps pages in shape", results, device, zoom_keeps_page_shape)
+          and check("Tap the page number to go to a page", results, device, go_to_page)
+          and check("Tracing on a PDF page is saved", results, device, tracing_kept)
+          and check("Clear asks first; Undo brings it back", results, device, clear_and_undo)
+          and check("A copy is saved with the tracing", results, device, save_with_tracing))
 
     device.shell(f"am force-stop {PACKAGE}", check=False)
     if started_emulator and not args.keep_emulator:

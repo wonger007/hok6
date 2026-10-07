@@ -160,7 +160,7 @@ python3 tools/build_assets.py
 ## Testing
 
 Quick tests (no device needed, about a minute): Kotlin unit tests for chapter sorting, file types, Word reading,
-finding the character under a tap and the stroke data bundle; JavaScript tests (Node.js) for the assembled Cantonese
+finding the character under a tap, the stroke data bundle, backups, and tracing loading back exactly as it was saved; JavaScript tests (Node.js) for the assembled Cantonese
 characters, tone names and readings.
 
 ```bash
@@ -171,8 +171,9 @@ tools/run_tests.sh
 
 `tools/device_check.py` installs "Hok6 (test)", copies `test/` to `Download/StudyBookCheck` on the device and
 checks, with no taps needed: chapters in order, a chapter's files, opening a PDF, Practice writing from the PDF, the
-stroke order panel, saving and sharing a US Letter PDF, writing on worksheets (finger and stylus), English lookup, and
-that pinching while dragging a PDF doesn't stretch its pages. Gestures with more than one finger are played by
+stroke order panel, saving and sharing a US Letter PDF, writing on worksheets (finger and stylus), English lookup,
+that pinching while dragging a PDF doesn't stretch its pages, going to a page by its number, tracing on a PDF page
+being saved, Clear asking first and Undo bringing the tracing back, and saving a copy with the tracing. Gestures with more than one finger are played by
 `TestGestures`, which is only in the test build (`app/src/debug/`). Screenshots go to `build/device-check/`. If no device is connected
 and ready, it starts the emulator instead and shuts it down afterwards (`--emulator` forces this, `--avd NAME`
 chooses which).
@@ -212,6 +213,7 @@ This project builds on, bundles data from, or was modelled on the following proj
 | [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cedict) | English → Chinese dictionary (bundled in `training/dict/`) | CC BY-SA 4.0 |
 | [CC-Canto](https://cantonese.org) | Cantonese words and Jyutping for the English → Chinese dictionary | CC BY-SA 3.0 |
 | [AndroidX Media3](https://github.com/androidx/media) | Audio playback | Apache 2.0 |
+| [AndroidX Input Motion Prediction](https://developer.android.com/jetpack/androidx/releases/input) | Drawing the line a little ahead of the pen, so tracing keeps up with its tip | Apache 2.0 |
 | [TomRoush/PdfBox-Android](https://github.com/TomRoush/PdfBox-Android) | Reading the characters on PDF pages, so tapping one in Practice mode opens writing practice | Apache 2.0 |
 | [Google ML Kit Text Recognition v2 (Chinese)](https://developers.google.com/ml-kit/vision/text-recognition/v2) | Recognising characters on scanned PDF pages that have no text layer (on-device, bundled model) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
 | [Google ML Kit Digital Ink Recognition](https://developers.google.com/ml-kit/vision/digital-ink-recognition) | **Write by hand** in writing practice: recognising handwritten characters (on-device; the Chinese model downloads once) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |

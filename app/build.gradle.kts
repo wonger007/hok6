@@ -11,8 +11,8 @@ android {
         applicationId = "com.studybook.reader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "1.9"
+        versionCode = 12
+        versionName = "1.10"
 
     }
 
@@ -86,6 +86,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("androidx.webkit:webkit:1.12.1")
+    implementation("androidx.input:input-motionprediction:1.0.0")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     implementation("com.google.mlkit:digital-ink-recognition:19.0.0")

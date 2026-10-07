@@ -24,6 +24,8 @@ import kotlin.math.min
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 4f
 private const val MAX_RENDER_WIDTH = 2400
+/** How far from the page on screen a page drawn ahead of time may be when its turn comes. */
+private const val PREFETCH_RANGE = 2
 
 /** Shows a PDF as a vertical list of pages rendered with the platform [PdfRenderer]. */
 class PdfViewer(
@@ -41,6 +43,8 @@ class PdfViewer(
     private var fd: ParcelFileDescriptor? = null
     private var pageSizes: List<Pair<Int, Int>> = emptyList()
     private var zoom = 1f
+    /** The page in the middle of the screen, for the render thread to skip pictures no longer needed. */
+    @Volatile private var shownPage = 0
     private val gap = (8 * context.resources.displayMetrics.density).toInt()
     private val layoutManager = LinearLayoutManager(context)
     private val adapter = PageAdapter()
@@ -180,15 +184,7 @@ class PdfViewer(
         val gen = generation.get()
         executor.execute {
             val r = renderer
-            val bitmap = if (r == null || generation.get() != gen) null else runCatching {
-                r.openPage(page).use { p ->
-                    val height = (width.toLong() * p.height / p.width).toInt().coerceAtLeast(1)
-                    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
-                        it.eraseColor(Color.WHITE)
-                        p.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    }
-                }
-            }.getOrNull()
+            val bitmap = if (r == null || generation.get() != gen) null else runCatching { draw(r, page, width) }.getOrNull()
             main.post { onResult(bitmap) }
         }
     }
@@ -207,8 +203,9 @@ class PdfViewer(
         val top = layoutManager.findViewByPosition(pos)?.top ?: 0
         val newScrollX = ((frame.scrollX + focusX) * ratio - focusX).toInt()
         zoom = newZoom
+        // The list is laid out again at the new width; each page on screen then draws its picture again at that size
+        // (InkPageView.onWidthChanged), keeping the old one, stretched, until the new one is ready rather than going blank.
         applyWidth()
-        adapter.notifyDataSetChanged()
         if (pos >= 0) layoutManager.scrollToPositionWithOffset(pos, ((top - focusY) * ratio + focusY).toInt())
         frame.post {
             frame.scrollTo(newScrollX, 0)
@@ -221,6 +218,7 @@ class PdfViewer(
     }
 
     private fun updateIndicator() {
+        shownPage = middlePage
         val count = pageSizes.size
         indicator.isVisible = count > 0
         if (count == 0) return
@@ -233,13 +231,7 @@ class PdfViewer(
             // Skip work for pages that scrolled away or documents that were closed meanwhile.
             if (r == null || generation.get() != gen || holder.page != page) return@execute
             val bitmap = try {
-                r.openPage(page).use { p ->
-                    val height = (width.toLong() * p.height / p.width).toInt().coerceAtLeast(1)
-                    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
-                        it.eraseColor(Color.WHITE)
-                        p.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    }
-                }
+                draw(r, page, width)
             } catch (t: Throwable) {
                 return@execute
             }
@@ -248,11 +240,39 @@ class PdfViewer(
                 cache.put(key(page, width), bitmap)
                 // Not if the page was shown at another size meanwhile; that size's picture is on its way.
                 if (holder.page == page && holder.renderWidth == width) holder.image.setImageBitmap(bitmap)
+                prefetchAround(page, width)
+            }
+        }
+    }
+
+    /**
+     * Draws the pages before and after [page] into the cache, so they're ready when scrolled to instead of white for a
+     * moment. Queued after the pages being shown, and skipped once the reader has moved on.
+     */
+    private fun prefetchAround(page: Int, width: Int) {
+        val gen = generation.get()
+        for (p in intArrayOf(page + 1, page - 1)) {
+            if (p !in pageSizes.indices || cache.get(key(p, width)) != null) continue
+            executor.execute {
+                val r = renderer
+                if (r == null || generation.get() != gen || abs(p - shownPage) > PREFETCH_RANGE) return@execute
+                if (cache.get(key(p, width)) != null) return@execute
+                val bitmap = runCatching { draw(r, p, width) }.getOrNull() ?: return@execute
+                main.post { if (generation.get() == gen) cache.put(key(p, width), bitmap) }
             }
         }
     }
 
     private fun key(page: Int, width: Int) = "$page@$width"
+
+    /** A page's picture [width] pixels wide. Only on the render thread: PdfRenderer is not thread-safe. */
+    private fun draw(r: PdfRenderer, page: Int, width: Int): Bitmap = r.openPage(page).use { p ->
+        val height = (width.toLong() * p.height / p.width).toInt().coerceAtLeast(1)
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+            it.eraseColor(Color.WHITE)
+            p.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+        }
+    }
 
     private class PageHolder(val image: InkPageView) : RecyclerView.ViewHolder(image) {
         @Volatile var page = -1
@@ -276,6 +296,7 @@ class PdfViewer(
         val cached = cache.get(key(position, renderWidth))
         if (cached != null) {
             holder.image.setImageBitmap(cached)
+            prefetchAround(position, renderWidth)
         } else {
             render(holder, position, renderWidth, generation.get())
         }

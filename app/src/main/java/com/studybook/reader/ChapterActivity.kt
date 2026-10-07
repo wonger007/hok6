@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.util.TypedValue
-import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -33,11 +32,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -54,6 +49,8 @@ class ChapterActivity : AppCompatActivity() {
         /** How deep, and how many folders, are offered as places to move files to. */
         private const val MOVE_DEPTH = 5
         private const val MOVE_MAX = 300
+        /** How long the message offering Undo after Clear stays, in milliseconds. */
+        private const val UNDO_MS = 5000
     }
 
     private val prefs by lazy { getSharedPreferences(PREFS, MODE_PRIVATE) }
@@ -89,10 +86,9 @@ class ChapterActivity : AppCompatActivity() {
     private var files: List<Entry> = emptyList()
     private var current: Entry? = null
     private var docxJob: Job? = null
-    /** Characters and their positions on each page of the open PDF, read in the background. */
-    private var pdfGlyphs: Deferred<List<List<PdfGlyph>>>? = null
-    /** Characters recognised from the images of scanned pages (pages with no text), by page. */
-    private val recognisedPages = HashMap<Int, List<PdfGlyph>>()
+    /** Choosing characters on the open file to practise. */
+    private lateinit var practice: PractiseFlow
+    private lateinit var pageIndicator: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,18 +121,20 @@ class ChapterActivity : AppCompatActivity() {
             color = Ink.PEN_COLORS[1]
         }
         docxText.surface = InkSurface(docxText, ink)
-        docxText.customSelectionActionModeCallback = PractiseSelection()
         docxText.ink = ink
-        docxText.onTapAt = { offset -> pickFromDocx(offset) }
 
         findViewById<RecyclerView>(R.id.files).apply {
             layoutManager = LinearLayoutManager(this@ChapterActivity)
             adapter = this@ChapterActivity.adapter
         }
-        pdf = PdfViewer(findViewById(R.id.pdf_frame), findViewById(R.id.pdf_pages), findViewById(R.id.page_indicator), ink)
-        findViewById<View>(R.id.page_indicator).setOnClickListener { askPage() }
+        pageIndicator = findViewById(R.id.page_indicator)
+        pdf = PdfViewer(findViewById(R.id.pdf_frame), findViewById(R.id.pdf_pages), pageIndicator as TextView, ink)
+        pageIndicator.setOnClickListener { askPage() }
         audio = AudioBar(this) { adapter.playing = it }
-        pdf.onPageTap = { page, x, y -> pickFromPdf(page, x, y) }
+        practice = PractiseFlow(this, pdf, docxText) { current?.name?.substringBeforeLast('.') ?: chapterName }
+        pdf.onPageTap = { page, x, y -> practice.pickFromPdf(page, x, y) }
+        docxText.customSelectionActionModeCallback = practice.Selection()
+        docxText.onTapAt = { offset -> practice.pickFromDocx(offset) }
 
         docx = DocxViewer(docxFrame, docxScroll, docxText, prefs)
         findViewById<View>(R.id.zoom_in).setOnClickListener { zoom(1) }
@@ -203,9 +201,8 @@ class ChapterActivity : AppCompatActivity() {
             R.id.move_files -> startSelection(null)
             R.id.save_traced -> saveTraced()
             R.id.writing_practice -> when {
-                current?.kind == Kind.PDF && pdfFrame.isVisible -> pickFromPdf(pdf.middlePage, null, null)
-                current?.kind == Kind.DOCX && docxFrame.isVisible ->
-                    PracticePicker.show(this, chineseIn(docxText.text), emptySet()) { practise(it) }
+                current?.kind == Kind.PDF && pdfFrame.isVisible -> practice.pickFromPdf(pdf.middlePage, null, null)
+                current?.kind == Kind.DOCX && docxFrame.isVisible -> practice.pickAllFromDocx()
                 else -> startActivity(Intent(this, TrainingActivity::class.java).putExtra(TrainingActivity.EXTRA_TITLE, chapterName))
             }
             else -> return super.onOptionsItemSelected(item)
@@ -407,7 +404,7 @@ class ChapterActivity : AppCompatActivity() {
                 if (r.failed.isNotEmpty()) lines += getString(R.string.move_failed, r.failed.joinToString("\n"),
                     r.error?.message ?: r.error?.javaClass?.simpleName)
                 if (r.skipped.isEmpty() && r.failed.isEmpty()) {
-                    Snackbar.make(findViewById(android.R.id.content), lines.joinToString(), Snackbar.LENGTH_LONG).show()
+                    message(lines.joinToString()).show()
                 } else {
                     MaterialAlertDialogBuilder(this@ChapterActivity)
                         .setMessage(lines.joinToString("\n\n"))
@@ -470,7 +467,7 @@ class ChapterActivity : AppCompatActivity() {
             }
             loadFiles()
             result.onSuccess {
-                Snackbar.make(findViewById(android.R.id.content), getString(R.string.saved_as, fileName), Snackbar.LENGTH_LONG).show()
+                message(getString(R.string.saved_as, fileName)).show()
             }.onFailure {
                 Toast.makeText(this@ChapterActivity, getString(R.string.save_failed, it.message ?: it.javaClass.simpleName),
                     Toast.LENGTH_LONG).show()
@@ -482,9 +479,7 @@ class ChapterActivity : AppCompatActivity() {
         savePdfPage()
         docxJob?.cancel()
         if (view !== pdfFrame) pdf.close()
-        pdfGlyphs?.cancel()
-        pdfGlyphs = null
-        recognisedPages.clear()
+        practice.reset()
         ink.document?.save()
         ink.document = InkDocument.load(this, entry.uri)
         current = entry
@@ -501,9 +496,7 @@ class ChapterActivity : AppCompatActivity() {
 
     private fun showPdf(entry: Entry) {
         select(entry, pdfFrame)
-        pdfGlyphs = lifecycleScope.async(Dispatchers.IO) {
-            runCatching { PdfText.load(this@ChapterActivity, entry.uri) }.getOrDefault(emptyList())
-        }
+        practice.openPdf(entry.uri)
         pdf.open(entry.uri, prefs.getInt(pageKey(entry.uri), 0)) { showError(it) }
     }
 
@@ -571,8 +564,9 @@ class ChapterActivity : AppCompatActivity() {
         val clear = { page: Int ->
             if (doc.clear(listOf(page))) {
                 invalidateInk()
-                Snackbar.make(findViewById(R.id.content_pane),
-                    if (isPdf) getString(R.string.cleared_page, page + 1) else getString(R.string.cleared), Snackbar.LENGTH_LONG)
+                message(if (isPdf) getString(R.string.cleared_page, page + 1) else getString(R.string.cleared))
+                    // A little longer than usual, to get to Undo after clearing.
+                    .setDuration(UNDO_MS)
                     .setAction(R.string.undo) { if (doc.undo()) invalidateInk() }
                     .show()
             }
@@ -589,6 +583,12 @@ class ChapterActivity : AppCompatActivity() {
         }
         dialog.show()
     }
+
+    /** A message at the bottom of the screen, above the page number when a PDF is open so it doesn't cover it. */
+    private fun message(text: String): Snackbar =
+        Snackbar.make(findViewById(android.R.id.content), text, Snackbar.LENGTH_LONG).apply {
+            if (pageIndicator.isVisible && pdfFrame.isVisible) anchorView = pageIndicator
+        }
 
     /** Asks for a page number and scrolls to it. */
     private fun askPage() {
@@ -723,95 +723,6 @@ class ChapterActivity : AppCompatActivity() {
     private fun savePdfPage() {
         val entry = current ?: return
         if (entry.kind == Kind.PDF && pdfFrame.isVisible) prefs.edit().putInt(pageKey(entry.uri), pdf.currentPage).apply()
-    }
-
-    /** Shows the Chinese characters of a PDF page; the one under a long-press (x, y in points) comes pre-selected. */
-    private fun pickFromPdf(page: Int, x: Float?, y: Float?) {
-        val glyphsJob = pdfGlyphs ?: return
-        lifecycleScope.launch {
-            var glyphs = glyphsJob.await().getOrNull(page).orEmpty()
-            // A scanned page has no text layer: recognise the characters from the page image instead.
-            val recognised = PdfText.chineseCharacters(glyphs).isEmpty()
-            if (recognised) glyphs = recognisedPages[page] ?: recognisePage(page).also { recognisedPages[page] = it }
-            val pressed = if (x != null && y != null) PdfText.glyphAt(glyphs, x, y, slop = 6f) else null
-            if (x != null && pressed == null) {
-                Toast.makeText(this@ChapterActivity, R.string.practise_miss, Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val preselected = pressed?.text?.let { chineseIn(it) }.orEmpty().toSet()
-            PracticePicker.show(this@ChapterActivity, PdfText.chineseCharacters(glyphs), preselected, recognised) { practise(it) }
-        }
-    }
-
-    /** Runs on-device text recognition on a rendered PDF page. */
-    private suspend fun recognisePage(page: Int): List<PdfGlyph> {
-        val widthPoints = pdf.pageWidthPoints(page) ?: return emptyList()
-        Toast.makeText(this, R.string.recognising, Toast.LENGTH_SHORT).show()
-        val pixels = 2000
-        val bitmap = suspendCancellableCoroutine<android.graphics.Bitmap?> { cont -> pdf.renderPage(page, pixels) { cont.resume(it) } }
-            ?: return emptyList()
-        return try {
-            PdfOcr.recognise(bitmap, widthPoints.toFloat() / pixels)
-        } finally {
-            bitmap.recycle()
-        }
-    }
-
-    /** Practise mode tap in a Word document: offers the characters of the tapped paragraph, the tapped one chosen. */
-    private fun pickFromDocx(offset: Int) {
-        val text = docxText.text
-        if (offset !in text.indices) return
-        val cp = Character.codePointAt(text, offset)
-        val tapped = String(Character.toChars(cp))
-        if (!isChinese(tapped)) {
-            Toast.makeText(this, R.string.practise_miss, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val start = text.lastIndexOf('\n', offset - 1).let { if (it < 0) 0 else it + 1 }
-        val end = text.indexOf('\n', offset).let { if (it < 0) text.length else it }
-        PracticePicker.show(this, chineseIn(text.subSequence(start, end)), setOf(tapped)) { practise(it) }
-    }
-
-    private fun chineseIn(text: CharSequence): List<String> =
-        text.codePoints().toArray().map { String(Character.toChars(it)) }.filter(::isChinese).distinct()
-
-    /** Opens writing practice with a worksheet for these characters. */
-    private fun practise(characters: List<String>) {
-        if (characters.isEmpty()) return
-        val title = current?.name?.substringBeforeLast('.') ?: chapterName
-        startActivity(
-            Intent(this, TrainingActivity::class.java)
-                .putExtra(TrainingActivity.EXTRA_TEXT, characters.joinToString(""))
-                .putExtra(TrainingActivity.EXTRA_TITLE, title)
-                .putExtra(TrainingActivity.EXTRA_AUTO_START, true)
-        )
-    }
-
-    /** Adds "Practise writing" to the text selection menu of Word documents. */
-    private inner class PractiseSelection : ActionMode.Callback {
-        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-            menu.add(Menu.NONE, R.id.practise_selection, 0, R.string.practise_title)
-                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-            return true
-        }
-
-        override fun onPrepareActionMode(mode: ActionMode, menu: Menu) = false
-
-        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-            if (item.itemId != R.id.practise_selection) return false
-            val start = minOf(docxText.selectionStart, docxText.selectionEnd).coerceAtLeast(0)
-            val end = maxOf(docxText.selectionStart, docxText.selectionEnd).coerceAtLeast(0)
-            val characters = chineseIn(docxText.text.subSequence(start, end))
-            if (characters.isEmpty()) {
-                Toast.makeText(this@ChapterActivity, R.string.practise_no_chinese, Toast.LENGTH_SHORT).show()
-            } else {
-                practise(characters)
-            }
-            mode.finish()
-            return true
-        }
-
-        override fun onDestroyActionMode(mode: ActionMode) = Unit
     }
 
     private fun openExternal(entry: Entry) {

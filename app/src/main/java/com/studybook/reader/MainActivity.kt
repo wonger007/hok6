@@ -23,6 +23,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -65,6 +67,13 @@ class MainActivity : AppCompatActivity() {
     /** Over the screen while the chapters load when Hok6 starts; null once gone. */
     private var splash: Splash? = null
     private var checkingBackup = false
+    /**
+     * Whether each folder card's folder has folders in it, found in the background after the cards are shown, so a tap
+     * opens the right screen at once instead of looking first.
+     */
+    private val hasFolders = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    private var lookAhead: Job? = null
+    private lateinit var opening: View
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -102,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         list.layoutManager = GridLayoutManager(this, spanCount())
         list.adapter = adapter
         choose = findViewById(R.id.choose)
+        opening = findViewById(R.id.opening)
         choose.setOnClickListener { pickFolder.launch(treeUri ?: DOWNLOADS) }
 
         treeUri = prefs.getString(BookFolder.KEY_ROOT, null)?.let(Uri::parse)?.takeIf { uri ->
@@ -183,6 +193,7 @@ class MainActivity : AppCompatActivity() {
                 adapter.favorites = favorites.mapTo(HashSet()) { it.docId }
                 adapter.filesCard = listing.files?.docId
                 adapter.items = favorites + listOfNotNull(listing.files) + others
+                lookInto(uri, listing.folders)
                 if (adapter.items.isEmpty()) {
                     showMessage(getString(if (isTop) R.string.no_chapters else R.string.empty_folder))
                 } else {
@@ -262,15 +273,37 @@ class MainActivity : AppCompatActivity() {
         choose.isVisible = isTop
     }
 
+    /** Finds out, in the background, which of these folders have folders in them (see [hasFolders]). */
+    private fun lookInto(uri: Uri, folders: List<Entry>) {
+        lookAhead?.cancel()
+        lookAhead = lifecycleScope.launch(Dispatchers.IO) {
+            for (folder in folders) {
+                if (!isActive) break
+                runCatching { Docs.listChildren(this@MainActivity, uri, folder.docId).any { it.isDir } }
+                    .onSuccess { hasFolders[folder.docId] = it }
+            }
+        }
+    }
+
     /** A folder with folders in it opens as cards one level down; otherwise (or the "Files in …" card) its files. */
     private fun openFolder(folder: Entry) {
         val uri = treeUri ?: return
         if (folder.docId == filesHere?.docId) return openFiles(folder)
+        // Already looking into a folder after a tap: one at a time.
+        if (opening.isVisible) return
         lifecycleScope.launch {
-            val hasFolders = withContext(Dispatchers.IO) {
-                runCatching { Docs.listChildren(this@MainActivity, uri, folder.docId).any { it.isDir } }.getOrDefault(false)
+            val deeper = hasFolders[folder.docId] ?: run {
+                // Not known yet: show that something is happening while looking.
+                opening.isVisible = true
+                try {
+                    withContext(Dispatchers.IO) {
+                        runCatching { Docs.listChildren(this@MainActivity, uri, folder.docId).any { it.isDir } }.getOrDefault(false)
+                    }.also { hasFolders[folder.docId] = it }
+                } finally {
+                    opening.isVisible = false
+                }
             }
-            if (hasFolders) {
+            if (deeper) {
                 startActivity(Intent(this@MainActivity, MainActivity::class.java)
                     .putExtra(EXTRA_DOC_ID, folder.docId)
                     .putStringArrayListExtra(EXTRA_PATH, ArrayList(path + title.toString())))

@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
+import androidx.input.motionprediction.MotionEventPredictor
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -117,8 +118,8 @@ class InkDocument private constructor(private val file: File) {
             json.put(page.toString(), JSONArray().apply {
                 for (s in strokes) put(JSONObject().apply {
                     put("c", s.color)
-                    put("w", s.width.toDouble())
-                    put("p", JSONArray().apply { s.points.forEach { put(it.toDouble()) } })
+                    put("w", round(s.width))
+                    put("p", JSONArray().apply { s.points.forEach { put(round(it)) } })
                 })
             })
         }
@@ -143,6 +144,12 @@ class InkDocument private constructor(private val file: File) {
         // One thread, so saves of the same file are written in order.
         private val writer = Executors.newSingleThreadExecutor()
 
+        /**
+         * Positions and widths are fractions of the page's width: 5 decimal places is within a fiftieth of a pixel on a
+         * page drawn 2400 pixels wide, and keeps the saved file and the backup about half the size of full precision.
+         */
+        internal fun round(v: Float): Double = Math.round(v * 100_000.0) / 100_000.0
+
         private fun fileFor(context: Context, uri: Uri): File {
             val digest = MessageDigest.getInstance("SHA-1").digest(uri.toString().toByteArray())
             val name = digest.joinToString("") { "%02x".format(it) }
@@ -165,8 +172,11 @@ class InkDocument private constructor(private val file: File) {
             writer.execute { file.delete() }
         }
 
-        fun load(context: Context, uri: Uri): InkDocument {
-            val doc = InkDocument(fileFor(context, uri))
+        fun load(context: Context, uri: Uri): InkDocument = load(fileFor(context, uri))
+
+        /** The tracing saved in [file] (none if it isn't there or can't be read). */
+        internal fun load(file: File): InkDocument {
+            val doc = InkDocument(file)
             runCatching {
                 if (!doc.file.exists()) return@runCatching
                 val json = JSONObject(doc.file.readText())
@@ -213,6 +223,8 @@ class InkSurface(private val view: View, private val ink: Ink) {
     private var livePoints = 0
     private var liveWidth = 0f
     private val scratch = Path()
+    /** Guesses where the pen is going, so the line being drawn keeps up with its tip. */
+    private val predictor by lazy { MotionEventPredictor.newInstance(view) }
     /**
      * The page's finished strokes as paths, made for one document version, page and view width, so drawing doesn't
      * work them out again each frame. Strokes are kept in widths of the page, so a new width means making them again.
@@ -236,6 +248,7 @@ class InkSurface(private val view: View, private val ink: Ink) {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN && ink.stylusSeen && toolType == MotionEvent.TOOL_TYPE_FINGER) return false
 
         val w = view.width.toFloat()
+        predictor.record(ev)
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 view.parent?.requestDisallowInterceptTouchEvent(true)
@@ -321,6 +334,11 @@ class InkSurface(private val view: View, private val ink: Ink) {
         }
         scratch.set(livePath)
         scratch.lineTo(p[p.size - 2] * w + 0.1f, p[p.size - 1] * w)
+        // Where the pen is about to be: drawn this frame only, never saved.
+        predictor.predict()?.let { predicted ->
+            scratch.lineTo(predicted.x, predicted.y)
+            predicted.recycle()
+        }
         paint.color = ink.color
         paint.strokeWidth = ink.widthDp * ink.density
         canvas.drawPath(scratch, paint)
