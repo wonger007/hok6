@@ -4,14 +4,23 @@
 
 Hok6 (學, *hok6* in Jyutping: to learn, to study, to imitate) is an Android tablet app for working through a Chinese (Cantonese or Mandarin) study book stored as folders of files.
 
-## How to use
-
-### 1. Install
+## Install
 
 1. On the Android tablet or phone, open the [latest release](https://github.com/wonger007/hok6/releases/latest) and
    download `Hok6-<version>-arm64-v8a.apk` (use `armeabi-v7a` only on an old 32-bit device).
 2. Open the downloaded file and allow installing from that source when Android asks. Android 8.0 or newer is needed.
    A new version installs over the old one and keeps your work.
+
+### Tested devices
+
+Hok6 has been tested only on:
+
+| Device | Android | Notes |
+| --- | --- | --- |
+| Samsung Galaxy Tab S7 FE 5G | 14 | Tablet layout; book on the microSD card |
+| Razer Edge WiFi | 12 | Phone layout (its screen is under 600dp at its narrowest) |
+
+It should work on other phones and tablets with Android 8.0 or newer, but they haven't been tried.
 
 ### Device settings
 
@@ -44,98 +53,15 @@ Samsung's menus differ from the ones above:
 - **Saving a worksheet as PDF**: Samsung asks for a folder in **My Files** (e.g. Download) and then **Done**; the file
   is saved with a `.PDF` ending.
 
-No Google account or Google Drive is needed: Hok6 keeps its backup as a file in your book folder (see step 7).
-No other permissions are needed either: Hok6 only asks for access to the book folder you choose (step 3), and audio keeps
+No Google account or Google Drive is needed: Hok6 keeps its backup as a file in your book folder (see
+[Keep your files tidy and your work safe](USER_GUIDE.md#6-keep-your-files-tidy-and-your-work-safe)).
+No other permissions are needed either: Hok6 only asks for access to the book folder you choose, and audio keeps
 playing with lock-screen controls without extra settings.
 
-### 2. Put your book on the device
+## Using Hok6
 
-Copy your book to the device (e.g. into **Download**) as one folder, with a sub-folder for each chapter:
-
-```
-My Book/
-├── Chapter 1/
-│   ├── Homework.pdf
-│   ├── Vocabulary.docx
-│   └── Lesson 1.mp3
-├── Chapter 2/
-│   └── …
-└── Notes.pdf          ← files here show as "Files in book folder"
-```
-
-Folders can hold more folders, so one folder can hold several books, each with chapter folders or not:
-
-```
-My Library/
-├── Book 1/
-│   ├── Chapter 1/
-│   └── Chapter 2/
-└── Book 2/            ← a book without chapters: its files are right here
-    └── Lesson 1.pdf
-```
-
-PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; other files open in another app.
-
-### 3. Open your book
-
-1. Open **Hok6** and tap **Choose book folder**. Pick your book folder, tap **Use this folder**, then **Allow**.
-   Hok6 remembers it; **Change book folder** (folder icon) picks another one.
-2. Tap a folder card. A folder with more folders in it (e.g. a book with chapters) opens as cards again, with the
-   folders above it shown under the title; **Back** goes up a level. A folder of files opens its file list; tap a file
-   to open it full screen, and **Back** returns to the list. A folder with both shows its files as a
-   **Files in this folder** card.
-3. Tap ☆ on a folder card to make it a favourite: favourites are listed first (★), handy when there are many folders.
-   They're kept in the backup with the rest of your work.
-4. Tap an audio file to play the folder's recordings, with speed and repeat controls.
-
-### 4. Do the homework on the page
-
-- **Write** straight on a PDF or Word page with a finger or stylus. Scroll and zoom with two fingers (once you use a
-  stylus, fingers only scroll).
-- Use the title bar to change the pen colour (tap the pen to open the colours) and size, erase, **Clear** a page
-  (it asks first, and which page when two are on screen; the message that appears offers **Undo**), or zoom.
-- Tap the page number at the bottom (e.g. **2 / 5**) to go to another page.
-- Your writing is saved automatically for each page.
-- When it's finished, ⋮ → **Save a copy with my tracing…** saves a new PDF with your writing on it, named e.g.
-  `completed_Homework.pdf`, in the same folder (the original isn't changed).
-
-### 5. Practice writing characters
-
-- On a page, tap **Practice Selector**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
-  worksheet with stroke order, a row to trace and rows to write in. Tap a pen to go back to writing on the page.
-- Or tap **Writing practice** on the main screen and type characters, words or English (e.g. *thank you*), or tap
-  **✍ Write by hand** to write a character with a stylus. English shows Chinese words right under the box; tap one to
-  use it. Then tap **Create worksheet**. Box size, guide lines and the rest are under **Worksheet options** (kept from
-  your last worksheet), and the words you practiced last are chips under the box: tap one to practice it again.
-- On a worksheet, tap a stroke-order square to watch the strokes and try **✍ Write it**; tap 🔊 to hear the word.
-  The title bar works like a homework page's: tap the pen for the colours, and **Clear** (with Undo in the message).
-  **Export** prints it or shares it as a PDF. **⋮** holds **☝ Fingers draw / scroll** (whether a finger writes) and
-  **Zoom in / out** (the menu stays open while you zoom; tap outside it to close).
-- Switch between **廣東話 Cantonese** and **普通話 Mandarin** at the top.
-
-### 6. Quiz yourself
-
-1. On a page, tap **Practice Selector**, tap a character, choose the ones to learn and tap **Add to quiz**.
-2. Open **Writing practice** and find the **Quiz** card (it appears once something is in the quiz):
-   - **Flash cards**: choose Chinese → meaning, English → Chinese or Sound → Chinese, tap **Start flash cards**, then
-     **Show answer** and mark **Knew it** or **Again**.
-   - **Written quiz**: choose the prompt (English meaning, the Chinese character, which can hide after a few seconds,
-     or the pronunciation), tap **Start written quiz** and write each character in the box. **Show me** shows how
-     it's written.
-3. Missed ones come back at the end of the round, and you can quiz the missed ones again.
-
-### 7. Keep your files tidy and your work safe
-
-- **Move files:** in a folder's file list, long-press a file (or ⋮ → **Move files…**), select files, tap **Move to…**
-  and pick any folder of the book (shown with its path, e.g. *Book 1 › Chapter 2*, favourites first) or **＋ New
-  folder**, which is made next to the current folder. ⋮ → **New folder…** on the folder cards makes a folder there.
-  The first time, Hok6 asks you to choose the book folder again and tap **Allow**, so it may change files.
-- **Backup:** Hok6 keeps a backup of your writing, tracing, history, bookmarks and quiz in your book folder, as
-  `Hok6 backup.json`, and updates it each time you leave a screen after changing something. It stays on the
-  tablet if Hok6 is removed. After reinstalling, choose the same book folder and tap **Restore**.
-  When you copy the book folder to a computer or another device, the backup goes with it.
-- To save a copy somewhere else, main screen ⋮ → **Back up my work…**; **Restore my work…** brings back any backup
-  file you pick.
+The [**User Guide**](USER_GUIDE.md) shows how to put your book on the device, do homework on the page, practice
+writing characters, quiz yourself, and keep your work backed up.
 
 ## Features
 
