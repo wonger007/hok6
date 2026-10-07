@@ -163,6 +163,15 @@ class PdfViewer(
         executor.shutdown()
     }
 
+    val pageCount: Int get() = pageSizes.size
+
+    /** Scrolls so [page] is at the top of the screen. */
+    fun goToPage(page: Int) {
+        if (pageSizes.isEmpty()) return
+        layoutManager.scrollToPositionWithOffset(page.coerceIn(0, pageSizes.size - 1), 0)
+        pages.post { updateIndicator() }
+    }
+
     /** Width of a page in PDF points, once the document is open. */
     fun pageWidthPoints(page: Int): Int? = pageSizes.getOrNull(page)?.first
 

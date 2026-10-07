@@ -92,8 +92,9 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 
 - **Write** straight on a PDF or Word page with a finger or stylus. Scroll and zoom with two fingers (once you use a
   stylus, fingers only scroll).
-- Use the title bar to change the pen colour (tap the pen to open the colours) and size, erase, **Clear** the screen
-  (the message that appears offers **Undo**), or zoom.
+- Use the title bar to change the pen colour (tap the pen to open the colours) and size, erase, **Clear** a page
+  (it asks first, and which page when two are on screen; the message that appears offers **Undo**), or zoom.
+- Tap the page number at the bottom (e.g. **2 / 5**) to go to another page.
 - Your writing is saved automatically for each page.
 - When it's finished, ⋮ → **Save a copy with my tracing…** saves a new PDF with your writing on it, named e.g.
   `completed_Homework.pdf`, in the same folder (the original isn't changed).
@@ -150,16 +151,16 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 - **Sized for the screen.** Text is a step bigger on small tablets and again on large ones (held further away than a
   phone), on top of Android's font size setting, which Writing practice follows too. Light or dark: the title bars
   stay red (a deeper red in dark mode), with lighter red and file-type colours on dark backgrounds.
-- **PDF** pages rendered in the app, with zoom and remembered position. Pages keep their shape however you pinch and
-  scroll, so tracing stays exactly where you wrote it.
+- **PDF** pages rendered in the app, with zoom and remembered position; tap the page number to go to a page. Pages keep
+  their shape however you pinch and scroll, so tracing stays exactly where you wrote it.
 - **Word (.docx)** shown as text in the app, keeping headings, bold/italic, tables and ruby (pinyin/jyutping) annotations.
   It's laid out like a page as wide as the screen's narrow side: pinch or − / + to zoom (the lines wrap the same way at
   every zoom and when the device is turned, so tracing stays on its words), and two fingers scroll, sideways too.
 - **Audio** (mp3, m4a, wav, …) as a folder playlist with a player bar, speed control, repeat-one and lock-screen controls.
 - **Tracing** on PDFs and Word documents with finger or stylus, on as soon as a file opens (two fingers scroll and
   zoom; once a stylus is used, only the stylus writes). The pen (tap it for the colours), size, eraser, **Clear** and zoom
-  are outlined buttons in the title bar, so nothing covers the page (**Clear** erases everything on screen at once, with
-  Undo in the message that follows); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
+  are outlined buttons in the title bar, so nothing covers the page (**Clear** erases one page's tracing after asking,
+  with Undo in the message that follows); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
   the pages (as sharp lines) into the same folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
 - **Practice Selector** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
 - **Writing practice** worksheets:

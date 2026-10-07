@@ -134,6 +134,7 @@ class ChapterActivity : AppCompatActivity() {
             adapter = this@ChapterActivity.adapter
         }
         pdf = PdfViewer(findViewById(R.id.pdf_frame), findViewById(R.id.pdf_pages), findViewById(R.id.page_indicator), ink)
+        findViewById<View>(R.id.page_indicator).setOnClickListener { askPage() }
         audio = AudioBar(this) { adapter.playing = it }
         pdf.onPageTap = { page, x, y -> pickFromPdf(page, x, y) }
 
@@ -551,19 +552,81 @@ class ChapterActivity : AppCompatActivity() {
             leavePractice()
             updateInkTools()
         }
-        // Clears everything on screen at once (a Word document is one long page); Undo brings it back.
-        findViewById<View>(R.id.ink_clear).setOnClickListener {
-            val doc = ink.document ?: return@setOnClickListener
-            if (!doc.clear(if (pdfFrame.isVisible) pdf.pagesOnScreen else listOf(0))) {
-                Toast.makeText(this, R.string.nothing_to_clear, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            invalidateInk()
-            Snackbar.make(findViewById(R.id.content_pane), R.string.cleared, Snackbar.LENGTH_LONG)
-                .setAction(R.string.undo) { if (doc.undo()) invalidateInk() }
-                .show()
-        }
+        findViewById<View>(R.id.ink_clear).setOnClickListener { askClear() }
         updateInkTools()
+    }
+
+    /**
+     * Clears one page's tracing after asking: the page on screen, or a choice when more than one page on screen has
+     * tracing (a Word document is one long page). Undo brings it back.
+     */
+    private fun askClear() {
+        val doc = ink.document ?: return
+        val isPdf = pdfFrame.isVisible
+        val traced = (if (isPdf) pdf.pagesOnScreen else listOf(0)).filter { doc.strokes(it).isNotEmpty() }
+        if (traced.isEmpty()) {
+            Toast.makeText(this, R.string.nothing_to_clear, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val clear = { page: Int ->
+            if (doc.clear(listOf(page))) {
+                invalidateInk()
+                Snackbar.make(findViewById(R.id.content_pane),
+                    if (isPdf) getString(R.string.cleared_page, page + 1) else getString(R.string.cleared), Snackbar.LENGTH_LONG)
+                    .setAction(R.string.undo) { if (doc.undo()) invalidateInk() }
+                    .show()
+            }
+        }
+        val dialog = MaterialAlertDialogBuilder(this).setNegativeButton(android.R.string.cancel, null)
+        when {
+            !isPdf -> dialog.setTitle(R.string.clear_ask_title).setMessage(R.string.clear_ask_document)
+                .setPositiveButton(R.string.clear) { _, _ -> clear(0) }
+            traced.size == 1 -> dialog.setTitle(R.string.clear_ask_title)
+                .setMessage(getString(R.string.clear_ask_page, traced[0] + 1))
+                .setPositiveButton(R.string.clear) { _, _ -> clear(traced[0]) }
+            else -> dialog.setTitle(R.string.clear_which_page)
+                .setItems(traced.map { getString(R.string.page_number, it + 1) }.toTypedArray()) { _, i -> clear(traced[i]) }
+        }
+        dialog.show()
+    }
+
+    /** Asks for a page number and scrolls to it. */
+    private fun askPage() {
+        val count = pdf.pageCount
+        if (count < 2) return
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = getString(R.string.go_to_page_hint, count)
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO or
+                android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        }
+        val pad = (24 * ink.density).toInt()
+        val box = android.widget.FrameLayout(this).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.go_to_page)
+            .setView(box)
+            .setPositiveButton(R.string.go, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            val go = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
+            input.setOnEditorActionListener { _, _, _ -> go.performClick() }
+            go.setOnClickListener {
+                val page = input.text.toString().toIntOrNull()
+                if (page == null || page !in 1..count) {
+                    input.error = getString(R.string.go_to_page_hint, count)
+                } else {
+                    dialog.dismiss()
+                    pdf.goToPage(page - 1)
+                }
+            }
+        }
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dialog.show()
+        input.requestFocus()
     }
 
     /** Picking a pen, size or the eraser means writing again. */

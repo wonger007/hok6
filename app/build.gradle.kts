@@ -11,8 +11,8 @@ android {
         applicationId = "com.studybook.reader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.8"
+        versionCode = 11
+        versionName = "1.9"
 
     }
 
@@ -30,7 +30,10 @@ android {
     buildTypes {
         // "Hok6": the app you use.
         release {
-            isMinifyEnabled = false
+            // Shrinking drops the unused parts of PdfBox, Bouncy Castle and the other libraries: a smaller APK that starts faster.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("personal")
         }
         // "Hok6 (test)": installed alongside for automated checks, with its own data and book folder.

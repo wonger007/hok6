@@ -54,6 +54,10 @@ class InkDocument private constructor(private val file: File) {
     private var dirty = false
     private val saveLater = Runnable { save() }
 
+    /** Goes up with every change, so views know when to make their drawing of the tracing again. */
+    var version = 0
+        private set
+
     fun strokes(page: Int): List<Stroke> = pages[page] ?: emptyList()
 
     fun add(page: Int, stroke: Stroke) {
@@ -98,6 +102,7 @@ class InkDocument private constructor(private val file: File) {
 
     /** Saves shortly after each change, so tracing survives the app being killed. */
     private fun changed() {
+        version++
         dirty = true
         main.removeCallbacks(saveLater)
         main.postDelayed(saveLater, 1000)
@@ -203,7 +208,20 @@ class InkSurface(private val view: View, private val ink: Ink) {
     var page = 0
     private var current: ArrayList<Float>? = null
     private var erasing = false
-    private val path = Path()
+    /** The stroke being drawn, in pixels, up to its last point but one (see [draw]); made for [liveWidth]. */
+    private val livePath = Path()
+    private var livePoints = 0
+    private var liveWidth = 0f
+    private val scratch = Path()
+    /**
+     * The page's finished strokes as paths, made for one document version, page and view width, so drawing doesn't
+     * work them out again each frame. Strokes are kept in widths of the page, so a new width means making them again.
+     */
+    private var cached: List<Path> = emptyList()
+    private var cachedDoc: InkDocument? = null
+    private var cachedVersion = -1
+    private var cachedPage = -1
+    private var cachedWidth = -1f
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -224,6 +242,8 @@ class InkSurface(private val view: View, private val ink: Ink) {
                 erasing = ink.tool == InkTool.ERASER || toolType == MotionEvent.TOOL_TYPE_ERASER ||
                     (ev.buttonState and MotionEvent.BUTTON_STYLUS_PRIMARY) != 0
                 if (erasing) erase(doc, ev.x, ev.y, w) else current = arrayListOf(ev.x / w, ev.y / w)
+                livePoints = 0
+                livePath.rewind()
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 // A second finger means "scroll or zoom" (ZoomPanView does it), not "draw".
@@ -262,18 +282,58 @@ class InkSurface(private val view: View, private val ink: Ink) {
         val doc = ink.document ?: return
         val w = view.width.toFloat()
         if (w <= 0f) return
-        for (s in doc.strokes(page)) drawStroke(canvas, s.points, s.color, s.width * w, w)
-        current?.let { drawStroke(canvas, it.toFloatArray(), ink.color, ink.widthDp * ink.density, w) }
+        val strokes = doc.strokes(page)
+        if (doc !== cachedDoc || doc.version != cachedVersion || page != cachedPage || w != cachedWidth || strokes.size != cached.size) {
+            cached = strokes.map { s -> Path().also { buildPath(it, s.points, s.points.size, w) } }
+            cachedDoc = doc
+            cachedVersion = doc.version
+            cachedPage = page
+            cachedWidth = w
+        }
+        for ((i, s) in strokes.withIndex()) {
+            paint.color = s.color
+            paint.strokeWidth = s.width * w
+            canvas.drawPath(cached[i], paint)
+        }
+        current?.let { drawLive(canvas, it, w) }
     }
 
-    private fun drawStroke(canvas: Canvas, p: FloatArray, color: Int, widthPx: Float, w: Float) {
+    /**
+     * The stroke being drawn. Its path grows by the points added since the last frame; the end that changes with each
+     * new point is added on a copy, so the stroke is one path (no darker spots where pieces of it would overlap).
+     */
+    private fun drawLive(canvas: Canvas, p: ArrayList<Float>, w: Float) {
         if (p.size < 2) return
-        path.rewind()
+        if (w != liveWidth || p.size < livePoints) {
+            livePath.rewind()
+            livePoints = 0
+            liveWidth = w
+        }
+        if (livePoints == 0) {
+            livePath.moveTo(p[0] * w, p[1] * w)
+            livePoints = 2
+        }
+        while (livePoints + 1 < p.size) {
+            val px = p[livePoints - 2] * w
+            val py = p[livePoints - 1] * w
+            livePath.quadTo(px, py, (px + p[livePoints] * w) / 2, (py + p[livePoints + 1] * w) / 2)
+            livePoints += 2
+        }
+        scratch.set(livePath)
+        scratch.lineTo(p[p.size - 2] * w + 0.1f, p[p.size - 1] * w)
+        paint.color = ink.color
+        paint.strokeWidth = ink.widthDp * ink.density
+        canvas.drawPath(scratch, paint)
+    }
+
+    /** A stroke's path at view width [w]: smooth curves through the midpoints, ending at the last point. */
+    private fun buildPath(path: Path, p: FloatArray, size: Int, w: Float) {
+        if (size < 2) return
         var px = p[0] * w
         var py = p[1] * w
         path.moveTo(px, py)
         var i = 2
-        while (i + 1 < p.size) {
+        while (i + 1 < size) {
             val x = p[i] * w
             val y = p[i + 1] * w
             path.quadTo(px, py, (px + x) / 2, (py + y) / 2)
@@ -282,9 +342,6 @@ class InkSurface(private val view: View, private val ink: Ink) {
             i += 2
         }
         path.lineTo(px + 0.1f, py)
-        paint.color = color
-        paint.strokeWidth = widthPx
-        canvas.drawPath(path, paint)
     }
 }
 
