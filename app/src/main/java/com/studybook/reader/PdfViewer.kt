@@ -237,7 +237,8 @@ class PdfViewer(
             main.post {
                 if (generation.get() != gen) return@post
                 cache.put(key(page, width), bitmap)
-                if (holder.page == page) holder.image.setImageBitmap(bitmap)
+                // Not if the page was shown at another size meanwhile; that size's picture is on its way.
+                if (holder.page == page && holder.renderWidth == width) holder.image.setImageBitmap(bitmap)
             }
         }
     }
@@ -246,6 +247,29 @@ class PdfViewer(
 
     private class PageHolder(val image: InkPageView) : RecyclerView.ViewHolder(image) {
         @Volatile var page = -1
+        /** The width the page's picture was made for. */
+        var renderWidth = 0
+    }
+
+    /**
+     * How wide the pages are at the current zoom. Worked out from the zoom rather than read from the list, which can
+     * still have its old width when pages are shown just after zooming (e.g. scrolling straight away).
+     */
+    private fun pageWidth(): Int {
+        val viewport = frame.width - frame.paddingLeft - frame.paddingRight
+        return (if (frame.contentWidth > 0) frame.contentWidth else viewport).coerceAtLeast(1)
+    }
+
+    /** Shows the page's picture at [width] pixels wide, from the cache or drawn in the background. */
+    private fun showPicture(holder: PageHolder, position: Int, width: Int) {
+        val renderWidth = min(width, MAX_RENDER_WIDTH)
+        holder.renderWidth = renderWidth
+        val cached = cache.get(key(position, renderWidth))
+        if (cached != null) {
+            holder.image.setImageBitmap(cached)
+        } else {
+            render(holder, position, renderWidth, generation.get())
+        }
     }
 
     private inner class PageAdapter : RecyclerView.Adapter<PageHolder>() {
@@ -258,6 +282,11 @@ class PdfViewer(
                 setBackgroundColor(Color.WHITE)
             }
             val holder = PageHolder(view)
+            // Laid out at a new width (zooming, turning the device): draw the picture again at that size.
+            view.onWidthChanged = { width ->
+                val page = holder.page
+                if (page in pageSizes.indices && min(width, MAX_RENDER_WIDTH) != holder.renderWidth) showPicture(holder, page, width)
+            }
             view.onTapAt = { x, y ->
                 val page = holder.page
                 if (page in pageSizes.indices && view.width > 0) {
@@ -269,19 +298,12 @@ class PdfViewer(
         }
 
         override fun onBindViewHolder(holder: PageHolder, position: Int) {
-            val viewWidth = pages.width.coerceAtLeast(1)
             val (pw, ph) = pageSizes[position]
-            holder.image.layoutParams.height = (viewWidth.toLong() * ph / pw).toInt()
+            holder.image.aspect = ph.toFloat() / pw
             holder.page = position
             holder.image.surface.page = position
-            val renderWidth = min(viewWidth, MAX_RENDER_WIDTH)
-            val cached = cache.get(key(position, renderWidth))
-            if (cached != null) {
-                holder.image.setImageBitmap(cached)
-            } else {
-                holder.image.setImageDrawable(null)
-                render(holder, position, renderWidth, generation.get())
-            }
+            holder.image.setImageDrawable(null)
+            showPicture(holder, position, pageWidth())
         }
 
         override fun onViewRecycled(holder: PageHolder) {

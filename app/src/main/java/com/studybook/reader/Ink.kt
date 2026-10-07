@@ -199,13 +199,10 @@ class Ink(context: Context) {
 }
 
 /** Touch handling and drawing of tracing on top of one view (a PDF page or the Word text). */
-class InkSurface(private val view: View, private val ink: Ink, private val pan: ((Float) -> Unit)? = null) {
+class InkSurface(private val view: View, private val ink: Ink) {
     var page = 0
     private var current: ArrayList<Float>? = null
     private var erasing = false
-    private var panning = false
-    private var lastPanY = 0f
-    private val location = IntArray(2)
     private val path = Path()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -224,24 +221,16 @@ class InkSurface(private val view: View, private val ink: Ink, private val pan: 
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 view.parent?.requestDisallowInterceptTouchEvent(true)
-                panning = false
                 erasing = ink.tool == InkTool.ERASER || toolType == MotionEvent.TOOL_TYPE_ERASER ||
                     (ev.buttonState and MotionEvent.BUTTON_STYLUS_PRIMARY) != 0
                 if (erasing) erase(doc, ev.x, ev.y, w) else current = arrayListOf(ev.x / w, ev.y / w)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                // A second finger means "scroll", not "draw".
+                // A second finger means "scroll or zoom" (ZoomPanView does it), not "draw".
                 current = null
                 erasing = false
-                panning = pan != null
-                lastPanY = screenY(ev)
             }
             MotionEvent.ACTION_MOVE -> when {
-                panning -> {
-                    val y = screenY(ev)
-                    pan?.invoke(lastPanY - y)
-                    lastPanY = y
-                }
                 erasing -> {
                     for (h in 0 until ev.historySize) erase(doc, ev.getHistoricalX(h), ev.getHistoricalY(h), w)
                     erase(doc, ev.x, ev.y, w)
@@ -255,7 +244,6 @@ class InkSurface(private val view: View, private val ink: Ink, private val pan: 
                     it += ev.y / w
                 }
             }
-            MotionEvent.ACTION_POINTER_UP -> if (panning) lastPanY = screenY(ev, skip = ev.actionIndex)
             MotionEvent.ACTION_UP -> {
                 current?.let { doc.add(page, Stroke(ink.color, ink.widthDp * ink.density / w, it.toFloatArray())) }
                 current = null
@@ -268,17 +256,6 @@ class InkSurface(private val view: View, private val ink: Ink, private val pan: 
 
     private fun erase(doc: InkDocument, x: Float, y: Float, w: Float) {
         if (doc.eraseAt(page, x / w, y / w, 12 * ink.density / w)) view.invalidate()
-    }
-
-    private fun screenY(ev: MotionEvent, skip: Int = -1): Float {
-        view.getLocationOnScreen(location)
-        var sum = 0f
-        var n = 0
-        for (i in 0 until ev.pointerCount) if (i != skip) {
-            sum += ev.getY(i)
-            n++
-        }
-        return location[1] + if (n == 0) 0f else sum / n
     }
 
     fun draw(canvas: Canvas) {
@@ -315,6 +292,21 @@ class InkSurface(private val view: View, private val ink: Ink, private val pan: 
 class InkPageView(context: Context, private val ink: Ink) : AppCompatImageView(context) {
     val surface = InkSurface(this, ink)
 
+    /**
+     * The page's height divided by its width. The view takes its height from its own width when it's laid out, so the
+     * page is never stretched: tracing is kept in widths of the page, and must land on the same spot of the picture.
+     */
+    var aspect = 1f
+        set(value) {
+            if (field != value) {
+                field = value
+                requestLayout()
+            }
+        }
+
+    /** Called when the view's width changes, so the page can be drawn again at the new size. */
+    var onWidthChanged: ((width: Int) -> Unit)? = null
+
     /** Tap in practise mode, with the point in this view's coordinates. */
     var onTapAt: ((x: Float, y: Float) -> Unit)? = null
     private var downX = 0f
@@ -322,6 +314,16 @@ class InkPageView(context: Context, private val ink: Ink) : AppCompatImageView(c
 
     init {
         setOnClickListener { if (ink.practising) onTapAt?.invoke(downX, downY) }
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        setMeasuredDimension(width, (width * aspect).toInt().coerceAtLeast(1))
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w != oldw && oldw != 0) onWidthChanged?.invoke(w)
     }
 
     override fun onDraw(canvas: Canvas) {

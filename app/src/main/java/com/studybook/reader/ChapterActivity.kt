@@ -41,8 +41,6 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val KEY_DOCX_SIZE = "docx_text_size"
-
 /** Where the last page read of a PDF is kept. */
 fun pageKey(uri: Uri) = "page:$uri"
 
@@ -71,6 +69,7 @@ class ChapterActivity : AppCompatActivity() {
     private lateinit var filesEmpty: View
     private lateinit var placeholder: View
     private lateinit var pdfFrame: View
+    private lateinit var docxFrame: ZoomPanView
     private lateinit var docxScroll: ScrollView
     private lateinit var docxText: InkTextView
     private lateinit var toolbarTitle: TextView
@@ -81,6 +80,7 @@ class ChapterActivity : AppCompatActivity() {
     private lateinit var eraserButton: ImageButton
     private lateinit var ink: Ink
     private lateinit var pdf: PdfViewer
+    private lateinit var docx: DocxViewer
     private lateinit var audio: AudioBar
     private val adapter = FileAdapter({ onFileClicked(it) }, { startSelection(it) })
     private val writeAccess = WriteAccess(this) { treeUri }
@@ -111,6 +111,7 @@ class ChapterActivity : AppCompatActivity() {
         filesEmpty = findViewById(R.id.files_empty)
         placeholder = findViewById(R.id.placeholder)
         pdfFrame = findViewById(R.id.pdf_frame)
+        docxFrame = findViewById(R.id.docx_frame)
         docxScroll = findViewById(R.id.docx_scroll)
         docxText = findViewById(R.id.docx_text)
         fileTools = findViewById(R.id.file_tools)
@@ -123,7 +124,7 @@ class ChapterActivity : AppCompatActivity() {
             // The title bar is red (a deeper red in dark mode); a blue pen stands out against it.
             color = Ink.PEN_COLORS[1]
         }
-        docxText.surface = InkSurface(docxText, ink) { dy -> docxScroll.scrollBy(0, dy.toInt()) }
+        docxText.surface = InkSurface(docxText, ink)
         docxText.customSelectionActionModeCallback = PractiseSelection()
         docxText.ink = ink
         docxText.onTapAt = { offset -> pickFromDocx(offset) }
@@ -136,7 +137,7 @@ class ChapterActivity : AppCompatActivity() {
         audio = AudioBar(this) { adapter.playing = it }
         pdf.onPageTap = { page, x, y -> pickFromPdf(page, x, y) }
 
-        docxText.setTextSize(TypedValue.COMPLEX_UNIT_SP, docxSize())
+        docx = DocxViewer(docxFrame, docxScroll, docxText, prefs)
         findViewById<View>(R.id.zoom_in).setOnClickListener { zoom(1) }
         findViewById<View>(R.id.zoom_out).setOnClickListener { zoom(-1) }
         setupInkTools()
@@ -187,7 +188,7 @@ class ChapterActivity : AppCompatActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.open_external).isVisible = current != null
-        // With a file open, the Practice selector does this.
+        // With a file open, the Practice Selector does this.
         menu.findItem(R.id.writing_practice).isVisible = current == null
         menu.findItem(R.id.move_files).isVisible = files.isNotEmpty()
         menu.findItem(R.id.save_traced).isVisible = current?.kind == Kind.PDF
@@ -202,7 +203,7 @@ class ChapterActivity : AppCompatActivity() {
             R.id.save_traced -> saveTraced()
             R.id.writing_practice -> when {
                 current?.kind == Kind.PDF && pdfFrame.isVisible -> pickFromPdf(pdf.middlePage, null, null)
-                current?.kind == Kind.DOCX && docxScroll.isVisible ->
+                current?.kind == Kind.DOCX && docxFrame.isVisible ->
                     PracticePicker.show(this, chineseIn(docxText.text), emptySet()) { practise(it) }
                 else -> startActivity(Intent(this, TrainingActivity::class.java).putExtra(TrainingActivity.EXTRA_TITLE, chapterName))
             }
@@ -234,7 +235,7 @@ class ChapterActivity : AppCompatActivity() {
         current = null
         ink.document = null
         adapter.selected = null
-        for (v in listOf(placeholder, pdfFrame, docxScroll)) v.isVisible = v === placeholder
+        for (v in listOf(placeholder, pdfFrame, docxFrame)) v.isVisible = v === placeholder
         fileTools.isVisible = false
         invalidateOptionsMenu()
     }
@@ -487,7 +488,7 @@ class ChapterActivity : AppCompatActivity() {
         ink.document = InkDocument.load(this, entry.uri)
         current = entry
         adapter.selected = entry.uri
-        for (v in listOf(placeholder, pdfFrame, docxScroll)) v.isVisible = v === view
+        for (v in listOf(placeholder, pdfFrame, docxFrame)) v.isVisible = v === view
         fileTools.isVisible = view !== placeholder
         showList(false)
         if (!writeHintShown) {
@@ -506,13 +507,14 @@ class ChapterActivity : AppCompatActivity() {
     }
 
     private fun showDocx(entry: Entry) {
-        select(entry, docxScroll)
+        select(entry, docxFrame)
         docxText.text = ""
         docxJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching { DocxReader.read(this@ChapterActivity, entry.uri) } }
             result.onSuccess {
                 docxText.text = it
                 docxScroll.scrollTo(0, 0)
+                docxFrame.scrollTo(0, 0)
             }.onFailure { showError(it) }
         }
     }
@@ -522,7 +524,7 @@ class ChapterActivity : AppCompatActivity() {
         current = null
         ink.document = null
         adapter.selected = null
-        for (v in listOf(placeholder, pdfFrame, docxScroll)) v.isVisible = v === placeholder
+        for (v in listOf(placeholder, pdfFrame, docxFrame)) v.isVisible = v === placeholder
         fileTools.isVisible = false
         showList(true)
         invalidateOptionsMenu()
@@ -647,16 +649,11 @@ class ChapterActivity : AppCompatActivity() {
         docxText.invalidate()
     }
 
-    /** The Word text size chosen with the zoom buttons, or the screen size's starting size. */
-    private fun docxSize() = prefs.getFloat(KEY_DOCX_SIZE, resources.getInteger(R.integer.docx_text_sp).toFloat())
-
     private fun zoom(direction: Int) {
         if (pdfFrame.isVisible) {
             pdf.zoomBy(if (direction > 0) 1.25f else 0.8f)
-        } else if (docxScroll.isVisible) {
-            val sp = (docxSize() + 2 * direction).coerceIn(12f, 48f)
-            prefs.edit().putFloat(KEY_DOCX_SIZE, sp).apply()
-            docxText.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+        } else if (docxFrame.isVisible) {
+            docx.zoomBy(if (direction > 0) 1.25f else 0.8f)
         }
     }
 

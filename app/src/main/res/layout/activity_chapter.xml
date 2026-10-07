@@ -150,26 +150,30 @@
                     android:paddingTop="8dp" />
             </com.studybook.reader.ZoomPanView>
 
-            <ScrollView
-                android:id="@+id/docx_scroll"
-                android:fillViewport="true"
+            <!-- A Word document, laid out like a page (see DocxViewer): zooming makes it bigger without re-wrapping
+                 the lines, so tracing stays on the words; zoomed in, it scrolls sideways too. -->
+            <com.studybook.reader.ZoomPanView
+                android:id="@+id/docx_frame"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:visibility="gone">
 
-                <com.studybook.reader.InkTextView
-                    android:id="@+id/docx_text"
+                <ScrollView
+                    android:id="@+id/docx_scroll"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:lineSpacingMultiplier="1.3"
-                    android:paddingStart="@dimen/docx_padding"
-                    android:paddingTop="32dp"
-                    android:paddingEnd="@dimen/docx_padding"
-                    android:paddingBottom="64dp"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textIsSelectable="true"
-                    android:textSize="20sp" />
-            </ScrollView>
+                    android:layout_height="match_parent"
+                    android:fillViewport="true">
+
+                    <com.studybook.reader.InkTextView
+                        android:id="@+id/docx_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:lineSpacingMultiplier="1.3"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textIsSelectable="true" />
+                </ScrollView>
+            </com.studybook.reader.ZoomPanView>
 
             <TextView
                 android:id="@+id/page_indicator"

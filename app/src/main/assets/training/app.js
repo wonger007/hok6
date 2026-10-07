@@ -1192,7 +1192,7 @@ function setupHome() {
     const err = $('formError');
     if (!words.length) {
       err.textContent = Core.englishPhrases($('fChars').value).length
-        ? 'Tap a Chinese word below to use it.' : 'Type at least one Chinese character or English word.';
+        ? 'Tap a Chinese word above to use it.' : 'Type at least one Chinese character or English word.';
       err.hidden = false;
       return;
     }

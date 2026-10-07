@@ -9,13 +9,14 @@ copies the book in test/ to Download/StudyBookCheck on the device, and then chec
   1. the chapters are listed in natural order (Chapter_2 before Chapter_10)
   2. a chapter lists all its files
   3. a PDF opens and shows its pages
-  4. Practice selector: tapping a character on the page lists the page's characters and opens writing practice
+  4. Practice Selector: tapping a character on the page lists the page's characters and opens writing practice
   5. the practice panel shows that character's stroke order (from the bundled stroke data)
   6. Export → Print / Save as PDF produces a US Letter PDF
   7. Export → Share PDF opens Android's share menu with a US Letter PDF drawn as lines and text (not a picture)
   8. writing on a worksheet is kept in app storage when the word is practiced again; Clear erases it and Undo restores it
   9. a stylus stroke on a worksheet is drawn (not taken as scrolling)
  10. typing English ("thank you") suggests Chinese words
+ 11. pinching while dragging a PDF (zooming while scrolling) doesn't stretch its pages, so tracing stays on the page
 
 Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
 
@@ -463,7 +464,7 @@ def main():
     practised = {}
 
     def practise_from_pdf():
-        # Practice selector on, then tap a character of the first page's title (centred near the top of the page).
+        # Practice Selector on, then tap a character of the first page's title (centred near the top of the page).
         device.tap(r"practice selector.*")
         time.sleep(1)
         xml = device.shell("cat /sdcard/sbcheck-ui.xml", check=False)
@@ -482,7 +483,7 @@ def main():
                 continue
             break
         else:
-            raise Failed("tapping the page title in Practice selector mode didn't open the character list")
+            raise Failed("tapping the page title in Practice Selector mode didn't open the character list")
         chips = [n for n in device.nodes() if len(n[0]) == 1 and re.match(r"[㐀-鿿\U00020000-\U0003ffff]", n[0])]
         if not chips:
             raise Failed("no Chinese characters listed for the page")
@@ -646,6 +647,54 @@ def main():
             raise Failed(f"a stylus stroke wasn't drawn ({spot['before']} strokes before, {after} after)")
         return "a stylus stroke in a writing square was drawn and kept"
 
+    def page_shapes():
+        out = device.shell("dumpsys activity top", check=False)
+        start = out.rfind("ACTIVITY " + PACKAGE + "/")
+        if start < 0:
+            return []
+        end = out.find("\n  ACTIVITY ", start + 1)
+        out = out[start:end if end > 0 else None]
+        return [(int(r) - int(l), int(b) - int(t)) for l, t, r, b in
+                re.findall(r"InkPageView\{[^}]*? (-?\d+),(-?\d+)-(-?\d+),(-?\d+)", out) if int(r) > int(l)]
+
+    def gesture(frames):
+        # Several fingers at once, played by the test build's TestGestures receiver (adb's `input` has only one).
+        js = json.dumps(frames, separators=(",", ":"))
+        device.shell(f"am broadcast -n {PACKAGE}/com.studybook.reader.TestGestures --es frames '{js}'")
+        time.sleep(sum(f[0] for f in frames) / 1000 + 0.8)
+
+    def zoom_keeps_page_shape():
+        # Pinching while dragging (zooming while scrolling) must not stretch the pages, or tracing lands off the picture.
+        device.shell(f"am force-stop {PACKAGE}")
+        device.shell(f"am start -n {MAIN}")
+        device.tap(re.escape(chapter))
+        device.tap(re.escape(pdf))
+        device.wait_for(r"1 / \d+", timeout=60)
+        time.sleep(1)
+        before = page_shapes()
+        if not before:
+            raise Failed("no PDF pages found on screen")
+        w, h = before[0]
+        size = device.shell("wm size").split()[-1]
+        sw, sh = map(int, size.split("x"))
+        cx, cy = sw // 2, sh // 2
+        for _ in range(3):
+            pinch_in = [[16, [[cx - d, cy], [cx + d, cy]]] for d in range(sw // 10, sw // 3, sw // 30)] + [[16, [None, None]]]
+            gesture(pinch_in)
+            frames = [[16, [[cx - d, cy], [cx + d, cy]]] for d in range(sw // 3, sw // 12, -(sw // 24))]
+            # One finger lifts and touches again at once: the pinch ends and the drag carries on with no pause.
+            frames += [[0, [[cx - sw // 12, cy], None]], [0, [[cx - sw // 12, cy], [cx + sw // 12, cy]]]]
+            frames += [[4, [[cx - sw // 12, cy - k * sh // 40], [cx + sw // 12, cy - k * sh // 40]]] for k in range(1, 9)]
+            gesture(frames + [[16, [None, None]]])
+        time.sleep(1)
+        after = page_shapes()
+        if not after:
+            raise Failed("no PDF pages on screen after the gestures")
+        bad = [(pw, ph) for pw, ph in after if abs(ph / pw - h / w) > 0.01]
+        if bad:
+            raise Failed(f"pages stretched: {bad} (should be {h / w:.3f} tall per width)")
+        return f"{len(after)} pages kept their shape ({h / w:.3f}) after pinching while dragging"
+
     def english_lookup():
         value = devtools_eval(device, "(async()=>{ if(!document.getElementById('sheet').hidden) closeSheet();"
                                       " const f=document.getElementById('fChars'); f.value='thank you';"
@@ -666,7 +715,8 @@ def main():
           and check("Worksheet shares as a PDF", results, device, share_pdf)
           and check("Writing is kept; Clear erases it", results, device, writing_kept_and_cleared)
           and check("A stylus writes on the worksheet", results, device, stylus_writes)
-          and check("English is looked up", results, device, english_lookup))
+          and check("English is looked up", results, device, english_lookup)
+          and check("Zooming while scrolling keeps pages in shape", results, device, zoom_keeps_page_shape))
 
     device.shell(f"am force-stop {PACKAGE}", check=False)
     if started_emulator and not args.keep_emulator:

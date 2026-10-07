@@ -100,7 +100,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 
 ### 5. Practice writing characters
 
-- On a page, tap **Practice selector**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
+- On a page, tap **Practice Selector**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
   worksheet with stroke order, a row to trace and rows to write in. Tap a pen to go back to writing on the page.
 - Or tap **Writing practice** on the main screen and type characters, words or English (e.g. *thank you*), or tap
   **✍ Write by hand** to write a character with a stylus. English shows Chinese words right under the box; tap one to
@@ -114,7 +114,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 
 ### 6. Quiz yourself
 
-1. On a page, tap **Practice selector**, tap a character, choose the ones to learn and tap **Add to quiz**.
+1. On a page, tap **Practice Selector**, tap a character, choose the ones to learn and tap **Add to quiz**.
 2. Open **Writing practice** and find the **Quiz** card (it appears once something is in the quiz):
    - **Flash cards**: choose Chinese → meaning, English → Chinese or Sound → Chinese, tap **Start flash cards**, then
      **Show answer** and mark **Knew it** or **Again**.
@@ -150,15 +150,18 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 - **Sized for the screen.** Text is a step bigger on small tablets and again on large ones (held further away than a
   phone), on top of Android's font size setting, which Writing practice follows too. Light or dark: the title bars
   stay red (a deeper red in dark mode), with lighter red and file-type colours on dark backgrounds.
-- **PDF** pages rendered in the app, with zoom and remembered position.
+- **PDF** pages rendered in the app, with zoom and remembered position. Pages keep their shape however you pinch and
+  scroll, so tracing stays exactly where you wrote it.
 - **Word (.docx)** shown as text in the app, keeping headings, bold/italic, tables and ruby (pinyin/jyutping) annotations.
+  It's laid out like a page as wide as the screen's narrow side: pinch or − / + to zoom (the lines wrap the same way at
+  every zoom and when the device is turned, so tracing stays on its words), and two fingers scroll, sideways too.
 - **Audio** (mp3, m4a, wav, …) as a folder playlist with a player bar, speed control, repeat-one and lock-screen controls.
 - **Tracing** on PDFs and Word documents with finger or stylus, on as soon as a file opens (two fingers scroll and
   zoom; once a stylus is used, only the stylus writes). The pen (tap it for the colours), size, eraser, **Clear** and zoom
   are outlined buttons in the title bar, so nothing covers the page (**Clear** erases everything on screen at once, with
   Undo in the message that follows); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
   the pages (as sharp lines) into the same folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
-- **Practice selector** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
+- **Practice Selector** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
 - **Writing practice** worksheets:
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;
   - stroke order shown above each row, plus stroke-order animation, step-by-step strokes and a writing quiz for each character;
@@ -170,7 +173,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
     and kept from the last worksheet;
   - outlined title bar tools, as on homework pages: the pen opens its colours, size, eraser, **Clear** (Undo in the
     message), with **☝ Fingers draw / scroll** and zoom under **⋮** so every button keeps Android's full 48dp size;
-  - **Quiz**: on a homework page, tap **Practice selector**, tap a character, choose characters and tap **Add to quiz**. Writing practice → Quiz
+  - **Quiz**: on a homework page, tap **Practice Selector**, tap a character, choose characters and tap **Add to quiz**. Writing practice → Quiz
     then offers **flash cards** (Chinese → meaning, English → Chinese, or sound → Chinese; you mark Knew it / Again)
     or a **written quiz**: write the character from memory in a blank box, checked stroke by stroke (a hint after 3
     misses, or **Show me**), prompted by its English meaning, its pronunciation, or the character itself, shown at the
@@ -241,7 +244,9 @@ tools/run_tests.sh
 
 `tools/device_check.py` installs "Hok6 (test)", copies `test/` to `Download/StudyBookCheck` on the device and
 checks, with no taps needed: chapters in order, a chapter's files, opening a PDF, Practice writing from the PDF, the
-stroke order panel, and saving a US Letter PDF. Screenshots go to `build/device-check/`. If no device is connected
+stroke order panel, saving and sharing a US Letter PDF, writing on worksheets (finger and stylus), English lookup, and
+that pinching while dragging a PDF doesn't stretch its pages. Gestures with more than one finger are played by
+`TestGestures`, which is only in the test build (`app/src/debug/`). Screenshots go to `build/device-check/`. If no device is connected
 and ready, it starts the emulator instead and shuts it down afterwards (`--emulator` forces this, `--avd NAME`
 chooses which).
 
