@@ -63,14 +63,30 @@ My Book/
 └── Notes.pdf          ← files here show as "Files in book folder"
 ```
 
+Folders can hold more folders, so one folder can hold several books, each with chapter folders or not:
+
+```
+My Library/
+├── Book 1/
+│   ├── Chapter 1/
+│   └── Chapter 2/
+└── Book 2/            ← a book without chapters: its files are right here
+    └── Lesson 1.pdf
+```
+
 PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; other files open in another app.
 
 ### 3. Open your book
 
 1. Open **Hok6** and tap **Choose book folder**. Pick your book folder, tap **Use this folder**, then **Allow**.
    Hok6 remembers it; **Change book folder** (folder icon) picks another one.
-2. Tap a chapter to see its files, then tap a file to open it full screen. **Back** returns to the file list.
-3. Tap an audio file to play the chapter's recordings, with speed and repeat controls.
+2. Tap a folder card. A folder with more folders in it (e.g. a book with chapters) opens as cards again, with the
+   folders above it shown under the title; **Back** goes up a level. A folder of files opens its file list; tap a file
+   to open it full screen, and **Back** returns to the list. A folder with both shows its files as a
+   **Files in this folder** card.
+3. Tap ☆ on a folder card to make it a favourite: favourites are listed first (★), handy when there are many folders.
+   They're kept in the backup with the rest of your work.
+4. Tap an audio file to play the folder's recordings, with speed and repeat controls.
 
 ### 4. Do the homework on the page
 
@@ -80,7 +96,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   (the message that appears offers **Undo**), or zoom.
 - Your writing is saved automatically for each page.
 - When it's finished, ⋮ → **Save a copy with my tracing…** saves a new PDF with your writing on it, named e.g.
-  `completed_Homework.pdf`, in the same chapter folder (the original isn't changed).
+  `completed_Homework.pdf`, in the same folder (the original isn't changed).
 
 ### 5. Practice writing characters
 
@@ -91,8 +107,9 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   use it. Then tap **Create worksheet**. Box size, guide lines and the rest are under **Worksheet options** (kept from
   your last worksheet), and the words you practiced last are chips under the box: tap one to practice it again.
 - On a worksheet, tap a stroke-order square to watch the strokes and try **✍ Write it**; tap 🔊 to hear the word.
-  The title bar works like a homework page's: tap the pen for the colours, **Clear** (with Undo in the message), and
-  **☝ Fingers draw / scroll** to choose whether a finger writes. **Export** prints it or shares it as a PDF.
+  The title bar works like a homework page's: tap the pen for the colours, and **Clear** (with Undo in the message).
+  **Export** prints it or shares it as a PDF. **⋮** holds **☝ Fingers draw / scroll** (whether a finger writes) and
+  **Zoom in / out** (the menu stays open while you zoom; tap outside it to close).
 - Switch between **廣東話 Cantonese** and **普通話 Mandarin** at the top.
 
 ### 6. Quiz yourself
@@ -108,8 +125,9 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 
 ### 7. Keep your files tidy and your work safe
 
-- **Move files:** in a chapter, long-press a file (or ⋮ → **Move files…**), select files, tap **Move to…** and pick a
-  chapter or **＋ New folder**. ⋮ → **New chapter folder…** on the main screen makes a new chapter.
+- **Move files:** in a folder's file list, long-press a file (or ⋮ → **Move files…**), select files, tap **Move to…**
+  and pick any folder of the book (shown with its path, e.g. *Book 1 › Chapter 2*, favourites first) or **＋ New
+  folder**, which is made next to the current folder. ⋮ → **New folder…** on the folder cards makes a folder there.
   The first time, Hok6 asks you to choose the book folder again and tap **Allow**, so it may change files.
 - **Backup:** Hok6 keeps a backup of your writing, tracing, history, bookmarks and quiz in your book folder, as
   `Hok6 backup.json`, and updates it each time you leave a screen after changing something. It stays on the
@@ -120,20 +138,26 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
 
 ## Features
 
-- **Book folder → chapters.** Pick a folder; each sub-folder is a chapter (sorted so "Chapter 2" comes before "Chapter 10").
-  Files directly in the book folder appear as "Files in book folder". A chapter opens as a full-screen file list; a
-  file opens full screen, and Back returns to the list.
-- **Organise files.** Long-press a file (or ⋮ → Move files…) to select files and move them to another chapter folder,
-  the book folder, or a new folder; tracing and the last page read move with them. ⋮ → New chapter folder… on the
-  main screen makes an empty chapter.
+- **Book folder → folders, as deep as you like.** Pick a folder; each folder in it is a card (sorted so "Chapter 2"
+  comes before "Chapter 10"), so it can hold one book's chapters or several books, with chapters or not. A folder
+  with folders in it opens as cards one level down (the path above it under the title); a folder of files opens as
+  a full-screen file list. Files directly in a folder that also has folders appear as "Files in book folder" or
+  "Files in this folder". A file opens full screen, and Back returns to the list.
+- **Favourite folders** (☆ on a card) are listed first, here and when moving files; they're in the backup.
+- **Organise files.** Long-press a file (or ⋮ → Move files…) to select files and move them to any folder of the book
+  (shown with its path), the book folder, or a new folder; tracing and the last page read move with them. ⋮ → New
+  folder… on the folder cards makes an empty folder there.
+- **Sized for the screen.** Text is a step bigger on small tablets and again on large ones (held further away than a
+  phone), on top of Android's font size setting, which Writing practice follows too. Light or dark: the title bars
+  stay red (a deeper red in dark mode), with lighter red and file-type colours on dark backgrounds.
 - **PDF** pages rendered in the app, with zoom and remembered position.
 - **Word (.docx)** shown as text in the app, keeping headings, bold/italic, tables and ruby (pinyin/jyutping) annotations.
-- **Audio** (mp3, m4a, wav, …) as a chapter playlist with a player bar, speed control, repeat-one and lock-screen controls.
+- **Audio** (mp3, m4a, wav, …) as a folder playlist with a player bar, speed control, repeat-one and lock-screen controls.
 - **Tracing** on PDFs and Word documents with finger or stylus, on as soon as a file opens (two fingers scroll and
   zoom; once a stylus is used, only the stylus writes). The pen (tap it for the colours), size, eraser, **Clear** and zoom
   are outlined buttons in the title bar, so nothing covers the page (**Clear** erases everything on screen at once, with
   Undo in the message that follows); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
-  the pages (as sharp lines) into the chapter folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
+  the pages (as sharp lines) into the same folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
 - **Practice selector** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
 - **Writing practice** worksheets:
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;
@@ -145,7 +169,7 @@ PDFs, Word documents (`.docx`) and audio (mp3, m4a, wav, …) open in the app; o
   - the words practiced last as one-tap chips under the practice box; worksheet options folded under the Create button
     and kept from the last worksheet;
   - outlined title bar tools, as on homework pages: the pen opens its colours, size, eraser, **Clear** (Undo in the
-    message), **☝ Fingers draw / scroll**, zoom;
+    message), with **☝ Fingers draw / scroll** and zoom under **⋮** so every button keeps Android's full 48dp size;
   - **Quiz**: on a homework page, tap **Practice selector**, tap a character, choose characters and tap **Add to quiz**. Writing practice → Quiz
     then offers **flash cards** (Chinese → meaning, English → Chinese, or sound → Chinese; you mark Knew it / Again)
     or a **written quiz**: write the character from memory in a blank box, checked stroke by stroke (a hint after 3

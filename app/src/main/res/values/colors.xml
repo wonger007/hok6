@@ -2,6 +2,13 @@
     <color name="brand">#C62828</color>
     <color name="brand_dark">#8E0000</color>
     <color name="accent">#F9A825</color>
+    <!-- Favourite stars: a darker gold on light cards so they stand out; brighter in dark mode. -->
+    <color name="star">#B07F00</color>
+    <!-- Red for text, icons and controls on the page; lighter in dark mode (values-night) so it reads on dark grey. -->
+    <color name="brand_text">#C62828</color>
+    <!-- Title bars and the status bar above them: Hok6 red, a deeper red in dark mode. -->
+    <color name="bar">#C62828</color>
+    <color name="bar_status">#8E0000</color>
     <color name="kind_pdf">#D32F2F</color>
     <color name="kind_docx">#1565C0</color>
     <color name="kind_audio">#00897B</color>
@@ -9,4 +16,5 @@
     <color name="selected_bg">#29C62828</color>
     <color name="pdf_bg">#808080</color>
     <color name="indicator_bg">#99000000</color>
+    <color name="seek_track">#29000000</color>
 </resources>

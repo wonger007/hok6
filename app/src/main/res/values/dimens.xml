@@ -4,4 +4,21 @@
     <!-- Splash logo: smaller on short screens (a phone on its side), so the name still fits above the middle. -->
     <dimen name="splash_logo">90dp</dimen>
     <dimen name="splash_logo_overlap">-18dp</dimen>
+    <!-- Title bar tool buttons: 48dp, the touch size Android recommends (on phones the tools slide sideways). -->
+    <dimen name="bar_button">48dp</dimen>
+
+    <!-- Text sizes in three steps: phone (here), small tablet (values-sw600dp) and large tablet (values-sw720dp),
+         since a bigger screen is held further away. Android's own font size setting applies on top. -->
+    <!-- Notes, hints, the audio time. -->
+    <dimen name="text_small">14sp</dimen>
+    <!-- Settings section headings. -->
+    <dimen name="text_header">15sp</dimen>
+    <!-- File names, settings rows, the audio title. -->
+    <dimen name="text_body">16sp</dimen>
+    <!-- Folder names on the cards. -->
+    <dimen name="text_card">18sp</dimen>
+    <!-- The welcome screen's heading. -->
+    <dimen name="text_title">22sp</dimen>
+    <!-- Word documents start at this size (sp); the zoom buttons change it from there. -->
+    <integer name="docx_text_sp">20</integer>
 </resources>

@@ -423,7 +423,11 @@ def main():
     device.shell(f"am start -n {MAIN}")
     time.sleep(3)
 
-    # First run only: grant access to the book folder (the picker starts in Download).
+    # First run only: the welcome screen (downloads aren't needed for these checks), then access to the book folder
+    # (the picker starts in Download).
+    if device.find(r"skip"):
+        device.tap(r"skip")
+        time.sleep(2)
     if device.find(r"choose book folder"):
         print("granting access to the book folder…")
         device.tap(r"choose book folder")
@@ -621,6 +625,8 @@ def main():
 
     def stylus_writes():
         # A stylus stroke in an empty writing square is drawn and kept: it must not scroll the page instead.
+        # Phones show one row at a time; the check draws on the whole page, so it switches there and back.
+        view = devtools_eval(device, "(()=>{ const v=state.view; if(v==='row') setView('page'); return v })()")
         spot = devtools_eval(device, "(()=>{ const pages=document.getElementById('pages');"
                                      " const svg=pageSvg(state.row); let r=svg.getBoundingClientRect();"
                                      " pages.scrollTop += r.top + 0.75*r.height - innerHeight/2; r=svg.getBoundingClientRect();"
@@ -635,7 +641,7 @@ def main():
         device.shell(f"input stylus swipe {x1} {y1} {x2} {y2} 500")
         time.sleep(1.5)
         after = devtools_eval(device, "(state.ink[state.row]||[]).length")
-        devtools_eval(device, "(()=>{ undo(); saveInk(); return 1 })()")
+        devtools_eval(device, "(()=>{ undo(); saveInk(); setView(%s); return 1 })()" % json.dumps(view))
         if after != spot["before"] + 1:
             raise Failed(f"a stylus stroke wasn't drawn ({spot['before']} strokes before, {after} after)")
         return "a stylus stroke in a writing square was drawn and kept"

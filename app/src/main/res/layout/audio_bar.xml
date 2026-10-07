@@ -28,6 +28,7 @@
             android:ellipsize="middle"
             android:paddingStart="8dp"
             android:singleLine="true"
+            android:textSize="@dimen/text_body"
             android:textStyle="bold" />
 
         <TextView
@@ -36,7 +37,8 @@
             android:layout_height="wrap_content"
             android:paddingStart="8dp"
             android:paddingEnd="4dp"
-            android:textSize="12sp" />
+            android:fontFeatureSettings="tnum"
+            android:textSize="@dimen/text_small" />
 
         <ImageButton
             android:id="@+id/audio_close"
@@ -49,8 +51,13 @@
         android:id="@+id/audio_seek"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp" />
+        android:maxHeight="4dp"
+        android:minHeight="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:progressDrawable="@drawable/seek_track"
+        android:splitTrack="false"
+        android:thumb="@drawable/seek_thumb" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -79,7 +86,7 @@
             android:padding="8dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_play"
-            app:tint="@color/brand" />
+            app:tint="@color/brand_text" />
 
         <ImageButton
             android:id="@+id/audio_next"

@@ -29,6 +29,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * Writing practice: worksheets with stroke order (Hanzi Writer), written on with finger or stylus,
@@ -61,7 +62,7 @@ class TrainingActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = getColor(R.color.brand_dark)
+        window.statusBarColor = getColor(R.color.bar_status)
         // Debug builds can be inspected from Chrome DevTools (chrome://inspect).
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
         web = WebView(this)
@@ -81,6 +82,8 @@ class TrainingActivity : AppCompatActivity() {
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
         web.settings.allowFileAccess = false
+        // Text follows Android's font size setting, like the rest of Hok6 (a web page ignores it otherwise).
+        web.settings.textZoom = (resources.configuration.fontScale * 100).roundToInt()
         web.webChromeClient = WebChromeClient()
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) = splash.done()

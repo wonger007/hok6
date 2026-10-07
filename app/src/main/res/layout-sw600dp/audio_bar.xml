@@ -35,7 +35,7 @@
         android:scaleType="fitCenter"
         android:padding="8dp"
         android:src="@drawable/ic_play"
-        app:tint="@color/brand" />
+        app:tint="@color/brand_text" />
 
     <ImageButton
         android:id="@+id/audio_next"
@@ -59,14 +59,20 @@
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:singleLine="true"
+            android:textSize="@dimen/text_body"
             android:textStyle="bold" />
 
         <SeekBar
             android:id="@+id/audio_seek"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp" />
+            android:maxHeight="4dp"
+            android:minHeight="4dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:progressDrawable="@drawable/seek_track"
+            android:splitTrack="false"
+            android:thumb="@drawable/seek_thumb" />
 
         <TextView
             android:id="@+id/audio_time"
@@ -74,7 +80,8 @@
             android:layout_height="wrap_content"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:textSize="12sp" />
+            android:fontFeatureSettings="tnum"
+            android:textSize="@dimen/text_small" />
     </LinearLayout>
 
     <com.google.android.material.button.MaterialButton

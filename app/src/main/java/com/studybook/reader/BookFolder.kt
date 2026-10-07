@@ -19,7 +19,7 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
-/** The book folder the user picked: keeping access to it, and changing it (moving files, making chapter folders). */
+/** The book folder the user picked: keeping access to it, and changing it (moving files, making folders). */
 object BookFolder {
     const val KEY_ROOT = "root_uri"
     private const val READ_WRITE = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -197,5 +197,27 @@ class WriteAccess(private val activity: AppCompatActivity, private val treeUri: 
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+}
+
+/**
+ * Favourite folders, shown first. Kept in [TrainingStore] so they're in Hok6's backup, by their path inside the book
+ * folder (e.g. "Book A/Chapter 1") so they still match when the book is restored on another device.
+ */
+object Favorites {
+    const val KEY = "favorite_folders"
+
+    fun key(rootId: String, docId: String) = docId.removePrefix("$rootId/")
+
+    fun all(context: Context): Set<String> {
+        val json = TrainingStore(context).get(KEY) ?: return emptySet()
+        val list = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return emptySet()
+        return (0 until list.length()).mapTo(LinkedHashSet()) { list.getString(it) }
+    }
+
+    fun set(context: Context, key: String, favorite: Boolean) {
+        val keys = all(context).toMutableSet()
+        if (favorite) keys += key else keys -= key
+        TrainingStore(context).set(KEY, org.json.JSONArray(keys.toList()).toString())
     }
 }

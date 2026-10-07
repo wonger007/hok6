@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The audio seek bar: a 4dp rounded line, red where it has played. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background" android:gravity="center_vertical|fill_horizontal">
+        <shape>
+            <corners android:radius="2dp" />
+            <size android:height="4dp" />
+            <solid android:color="@color/seek_track" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress" android:gravity="center_vertical|fill_horizontal">
+        <scale android:scaleWidth="100%">
+            <shape>
+                <corners android:radius="2dp" />
+                <size android:height="4dp" />
+                <solid android:color="@color/brand_text" />
+            </shape>
+        </scale>
+    </item>
+</layer-list>

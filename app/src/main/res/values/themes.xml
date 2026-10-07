@@ -3,9 +3,20 @@
         <item name="colorPrimary">@color/brand</item>
         <item name="colorPrimaryVariant">@color/brand_dark</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">@color/accent</item>
-        <item name="colorSecondaryVariant">#C17900</item>
-        <item name="colorOnSecondary">#000000</item>
+        <!-- Switches, radio buttons and seek bars: the same red as the rest (amber was hard to see on white). -->
+        <item name="colorSecondary">@color/brand_text</item>
+        <item name="colorSecondaryVariant">@color/brand_dark</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <!-- The title bar stays red in dark mode too (a deeper red), rather than turning grey. -->
+        <item name="colorPrimarySurface">@color/bar</item>
+        <item name="colorOnPrimarySurface">#FFFFFF</item>
+        <item name="android:statusBarColor">@color/bar_status</item>
+        <item name="actionBarStyle">@style/HokActionBar</item>
+    </style>
+
+    <!-- The title bar of screens with Android's own bar (the folder cards, Settings): red, deeper red in dark mode. -->
+    <style name="HokActionBar" parent="Widget.MaterialComponents.ActionBar.Primary">
+        <item name="background">@color/bar</item>
     </style>
 
     <!-- The main screen while Hok6 starts; it switches to Theme.StudyBook once it's running. -->
@@ -19,7 +30,11 @@
         <item name="colorPrimary">@color/brand</item>
         <item name="colorPrimaryVariant">@color/brand_dark</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">@color/accent</item>
+        <item name="colorSecondary">@color/brand_text</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorPrimarySurface">@color/bar</item>
+        <item name="colorOnPrimarySurface">#FFFFFF</item>
+        <item name="android:statusBarColor">@color/bar_status</item>
     </style>
 
     <style name="SettingsHeader">
@@ -27,9 +42,10 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">20dp</item>
         <item name="android:layout_marginBottom">4dp</item>
-        <item name="android:textColor">?attr/colorPrimary</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/brand_text</item>
+        <item name="android:textSize">@dimen/text_header</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.03</item>
     </style>
 
     <style name="PlayerButton">
@@ -42,8 +58,8 @@
 
     <!-- Tools in the title bar of the chapter screen -->
     <style name="BarButton">
-        <item name="android:layout_width">40dp</item>
-        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_width">@dimen/bar_button</item>
+        <item name="android:layout_height">@dimen/bar_button</item>
         <item name="android:layout_marginStart">3dp</item>
         <item name="android:layout_marginEnd">3dp</item>
         <item name="android:background">@drawable/bar_button</item>
@@ -53,7 +69,7 @@
 
     <style name="BarTextButton">
         <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_height">@dimen/bar_button</item>
         <item name="android:layout_marginStart">3dp</item>
         <item name="android:layout_marginEnd">3dp</item>
         <item name="android:background">@drawable/bar_button</item>

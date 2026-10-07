@@ -132,7 +132,7 @@ object Backup {
         return Summary(words, traced)
     }
 
-    /** One stored value after restoring: history, bookmarks and the quiz combine both copies; anything else is the backup's. */
+    /** One stored value after restoring: history, bookmarks, the quiz and favourite folders combine both copies; anything else is the backup's. */
     fun merge(key: String, local: String?, incoming: Any): String {
         val here = local?.let { runCatching { JSONTokener(it).nextValue() }.getOrNull() }
         return when {
@@ -145,7 +145,7 @@ object Backup {
                 }
                 here.toString()
             }
-            (key == "bookmarks" || key == QuizStash.KEY) && here is JSONArray && incoming is JSONArray -> {
+            (key == "bookmarks" || key == QuizStash.KEY || key == Favorites.KEY) && here is JSONArray && incoming is JSONArray -> {
                 val seen = HashSet<String>()
                 for (i in 0 until here.length()) seen += here.getString(i)
                 for (i in 0 until incoming.length()) if (seen.add(incoming.getString(i))) here.put(incoming.getString(i))

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The audio seek bar's knob: a bit bigger than Android's, so it's easy to grab on a tablet. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <size android:width="20dp" android:height="20dp" />
+    <solid android:color="@color/brand_text" />
+</shape>

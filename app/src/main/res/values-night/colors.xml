@@ -1,0 +1,13 @@
+<resources>
+    <color name="brand_text">#EF5350</color>
+    <color name="bar">#8E1B1B</color>
+    <color name="bar_status">#5E1010</color>
+    <color name="kind_pdf">#EF5350</color>
+    <color name="kind_docx">#64B5F6</color>
+    <color name="kind_audio">#4DB6AC</color>
+    <color name="kind_other">#A0A0A0</color>
+    <color name="selected_bg">#3DEF5350</color>
+    <color name="pdf_bg">#3A3A3A</color>
+    <color name="star">#FBC02D</color>
+    <color name="seek_track">#3DFFFFFF</color>
+</resources>

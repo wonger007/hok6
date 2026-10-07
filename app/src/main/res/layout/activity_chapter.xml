@@ -183,6 +183,8 @@
                 android:paddingEnd="14dp"
                 android:paddingBottom="6dp"
                 android:textColor="#FFFFFF"
+                android:textSize="@dimen/text_header"
+                android:textStyle="bold"
                 android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>

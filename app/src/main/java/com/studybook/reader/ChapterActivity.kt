@@ -2,7 +2,6 @@ package com.studybook.reader
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -52,6 +51,11 @@ class ChapterActivity : AppCompatActivity() {
         const val EXTRA_TREE = "tree"
         const val EXTRA_DOC_ID = "doc_id"
         const val EXTRA_NAME = "name"
+        /** The folder this one is in, where a new folder for moving files is made (the book folder if missing). */
+        const val EXTRA_PARENT_ID = "parent_id"
+        /** How deep, and how many folders, are offered as places to move files to. */
+        private const val MOVE_DEPTH = 5
+        private const val MOVE_MAX = 300
     }
 
     private val prefs by lazy { getSharedPreferences(PREFS, MODE_PRIVATE) }
@@ -116,9 +120,8 @@ class ChapterActivity : AppCompatActivity() {
         // Files open ready to write on; Practice mode switches tapping to choosing characters instead.
         ink = Ink(this).apply {
             active = true
-            // The title bar is red in light mode (dark grey in dark mode); a blue pen stands out against it there.
-            val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-            if (!night) color = Ink.PEN_COLORS[1]
+            // The title bar is red (a deeper red in dark mode); a blue pen stands out against it.
+            color = Ink.PEN_COLORS[1]
         }
         docxText.surface = InkSurface(docxText, ink) { dy -> docxScroll.scrollBy(0, dy.toInt()) }
         docxText.customSelectionActionModeCallback = PractiseSelection()
@@ -133,7 +136,7 @@ class ChapterActivity : AppCompatActivity() {
         audio = AudioBar(this) { adapter.playing = it }
         pdf.onPageTap = { page, x, y -> pickFromPdf(page, x, y) }
 
-        docxText.setTextSize(TypedValue.COMPLEX_UNIT_SP, prefs.getFloat(KEY_DOCX_SIZE, 20f))
+        docxText.setTextSize(TypedValue.COMPLEX_UNIT_SP, docxSize())
         findViewById<View>(R.id.zoom_in).setOnClickListener { zoom(1) }
         findViewById<View>(R.id.zoom_out).setOnClickListener { zoom(-1) }
         setupInkTools()
@@ -292,34 +295,63 @@ class ChapterActivity : AppCompatActivity() {
         }
     }
 
-    /** Offers the book's other chapter folders, the book folder itself, and a new folder, to move the selected files to. */
+    /** A folder of the book and its path inside it, e.g. "Book A › Chapter 1". */
+    private class Place(val folder: Entry, val label: String)
+
+    /** The book's folders, each followed by the folders inside it, a few levels deep. */
+    private fun bookFolders(rootId: String): List<Place> {
+        val out = ArrayList<Place>()
+        val separator = getString(R.string.path_separator)
+        fun walk(parentId: String, prefix: String, depth: Int) {
+            if (depth > MOVE_DEPTH) return
+            for (folder in Docs.listChildren(this, treeUri, parentId).filter { it.isDir }) {
+                if (out.size >= MOVE_MAX) return
+                val label = prefix + folder.name
+                out += Place(folder, label)
+                walk(folder.docId, label + separator, depth + 1)
+            }
+        }
+        walk(rootId, "", 1)
+        return out
+    }
+
+    /** Offers the book's other folders (favourites first), the book folder itself, and a new folder, to move the selected files to. */
     private fun chooseMoveTarget() {
         val chosen = files.filter { it.uri in adapter.checked }
         if (chosen.isEmpty()) return
         writeAccess.run {
             lifecycleScope.launch {
                 val rootId = DocumentsContract.getTreeDocumentId(treeUri)
-                val folders = withContext(Dispatchers.IO) {
-                    runCatching { Docs.listChildren(this@ChapterActivity, treeUri, rootId).filter { it.isDir } }
+                // A new folder goes next to this one.
+                val parentId = intent.getStringExtra(EXTRA_PARENT_ID) ?: rootId
+                val found = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val favorites = Favorites.all(this@ChapterActivity)
+                        val (fav, rest) = bookFolders(rootId).partition { Favorites.key(rootId, it.folder.docId) in favorites }
+                        val siblings = Docs.listChildren(this@ChapterActivity, treeUri, parentId).filter { it.isDir }.map { it.name }
+                        (fav + rest) to siblings
+                    }
                 }.getOrElse {
                     Toast.makeText(this@ChapterActivity, getString(R.string.cannot_open, it.message), Toast.LENGTH_LONG).show()
                     return@launch
                 }
+                val (places, siblings) = found
                 val targets = buildList {
-                    if (docId != rootId) add(Entry(DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId), rootId,
-                        getString(R.string.book_folder_target), DocumentsContract.Document.MIME_TYPE_DIR, true))
-                    addAll(folders.filter { it.docId != docId })
+                    if (docId != rootId) add(Place(Entry(DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId), rootId,
+                        getString(R.string.book_folder_target), DocumentsContract.Document.MIME_TYPE_DIR, true),
+                        getString(R.string.book_folder_target)))
+                    addAll(places.filter { it.folder.docId != docId })
                 }
-                val labels = listOf(getString(R.string.new_folder_item)) + targets.map { it.name }
+                val labels = listOf(getString(R.string.new_folder_item)) + targets.map { it.label }
                 MaterialAlertDialogBuilder(this@ChapterActivity)
                     .setTitle(getString(R.string.move_title, chosen.size))
                     .setItems(labels.toTypedArray()) { _, i ->
                         if (i == 0) {
-                            BookFolder.askFolderName(this@ChapterActivity, folders.map { it.name }) { name ->
-                                moveFiles(chosen) { BookFolder.createFolder(this@ChapterActivity, treeUri, rootId, name) }
+                            BookFolder.askFolderName(this@ChapterActivity, siblings) { name ->
+                                moveFiles(chosen) { BookFolder.createFolder(this@ChapterActivity, treeUri, parentId, name) }
                             }
                         } else {
-                            moveFiles(chosen) { targets[i - 1] }
+                            moveFiles(chosen) { targets[i - 1].folder }
                         }
                     }
                     .setNegativeButton(android.R.string.cancel, null)
@@ -386,7 +418,7 @@ class ChapterActivity : AppCompatActivity() {
         }
     }
 
-    /** Saves a copy of the open PDF with the tracing drawn in, in this chapter folder, under a name the user picks. */
+    /** Saves a copy of the open PDF with the tracing drawn in, in this folder, under a name the user picks. */
     private fun saveTraced(name: String? = null) {
         val entry = current?.takeIf { it.kind == Kind.PDF } ?: return
         val strokes = ink.document?.snapshot().orEmpty()
@@ -549,7 +581,8 @@ class ChapterActivity : AppCompatActivity() {
         // The dot shows the pen's colour and size.
         penButton.imageTintList = null // the bar's icon colour would turn the dot white
         penButton.setImageDrawable(colourDot(ink.color))
-        val pad = ((14 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
+        // The 48dp button less the padding leaves a 12, 20 or 28dp dot.
+        val pad = ((18 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
         penButton.scaleType = ImageView.ScaleType.FIT_CENTER
         penButton.setPadding(pad, pad, pad, pad)
         eraserButton.setBackgroundResource(
@@ -614,11 +647,14 @@ class ChapterActivity : AppCompatActivity() {
         docxText.invalidate()
     }
 
+    /** The Word text size chosen with the zoom buttons, or the screen size's starting size. */
+    private fun docxSize() = prefs.getFloat(KEY_DOCX_SIZE, resources.getInteger(R.integer.docx_text_sp).toFloat())
+
     private fun zoom(direction: Int) {
         if (pdfFrame.isVisible) {
             pdf.zoomBy(if (direction > 0) 1.25f else 0.8f)
         } else if (docxScroll.isVisible) {
-            val sp = (prefs.getFloat(KEY_DOCX_SIZE, 20f) + 2 * direction).coerceIn(12f, 48f)
+            val sp = (docxSize() + 2 * direction).coerceIn(12f, 48f)
             prefs.edit().putFloat(KEY_DOCX_SIZE, sp).apply()
             docxText.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
         }
@@ -781,7 +817,7 @@ private class FileAdapter(
         }
         val isChecked = item.uri in checked
         holder.icon.setImageResource(if (isChecked) R.drawable.ic_check else icon)
-        holder.icon.setColorFilter(ContextCompat.getColor(context, if (isChecked) R.color.brand else color))
+        holder.icon.setColorFilter(ContextCompat.getColor(context, if (isChecked) R.color.brand_text else color))
         holder.name.text = item.name
         val isPlaying = item.uri == playing
         holder.name.setTypeface(null, if (isPlaying || item.uri == selected) Typeface.BOLD else Typeface.NORMAL)

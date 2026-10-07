@@ -50,6 +50,19 @@ class SavedWorkTest {
     }
 
     @Test
+    fun favoriteFoldersAreCombined() {
+        val merged = JSONArray(Backup.merge(Favorites.KEY, """["Book A"]""", JSONArray("""["Book A/Chapter 2","Book A"]""")))
+        assertEquals(listOf("Book A", "Book A/Chapter 2"), List(merged.length()) { merged.getString(it) })
+    }
+
+    @Test
+    fun favoriteFoldersAreKeptByTheirPathInTheBook() {
+        assertEquals("Book A/Chapter 1", Favorites.key("primary:Download/Library", "primary:Download/Library/Book A/Chapter 1"))
+        // Storage that doesn't use paths for its ids keeps the id.
+        assertEquals("doc:42", Favorites.key("doc:1", "doc:42"))
+    }
+
+    @Test
     fun otherValuesComeFromTheBackup() {
         assertEquals("[1,2]", Backup.merge("ink:你|large|s", "[3]", JSONArray("[1,2]")))
         assertEquals("\"cmn\"", Backup.merge("lang", "\"yue\"", "cmn"))

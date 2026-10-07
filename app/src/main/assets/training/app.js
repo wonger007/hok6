@@ -343,8 +343,7 @@ function setView(view) {
   state.view = view;
   if (IS_PHONE) store.set('phoneView', view);
   document.body.classList.toggle('row-view', view === 'row');
-  $('viewBtn').textContent = view === 'row' ? '📄' : '▦';
-  $('viewBtn').setAttribute('aria-label', view === 'row' ? 'Show whole pages' : 'Show one row at a time');
+  $('viewBtn').textContent = view === 'row' ? '📄 Whole pages' : '▦ One row at a time';
   if (view === 'row' && state.ws) renderRow();
 }
 
@@ -1864,6 +1863,7 @@ async function openSheet(ws) {
 
 function closeSheet() {
   saveInk();
+  $('moreMenu').hidden = true;
   state.ws = null;
   $('pages').innerHTML = '';
   $('sheet').hidden = true;
@@ -1891,6 +1891,16 @@ function updateTools() {
   $('eraserBtn').classList.toggle('sel', state.tool === 'eraser');
 }
 
+/* ⋮ opens the less-used tools under it, at the right; zooming leaves it open (to zoom again), the rest close it. */
+function toggleMoreMenu() {
+  const menu = $('moreMenu');
+  if (!menu.hidden) { menu.hidden = true; return; }
+  const r = $('moreBtn').getBoundingClientRect();
+  menu.style.top = (r.bottom + 6) + 'px';
+  menu.style.right = Math.max(8, innerWidth - r.right) + 'px';
+  menu.hidden = false;
+}
+
 /* The pen colours open under the pen button; choosing one (or tapping anywhere else) closes them. */
 function toggleColorTray() {
   const tray = $('colorTray');
@@ -1911,7 +1921,13 @@ function setupSheet() {
   });
   document.addEventListener('pointerdown', (e) => {
     if (!$('colorTray').hidden && !e.target.closest('#colorTray, #penBtn')) $('colorTray').hidden = true;
+    if (!$('moreMenu').hidden && !e.target.closest('#moreMenu, #moreBtn')) $('moreMenu').hidden = true;
   }, true);
+  $('moreBtn').onclick = (e) => { e.stopPropagation(); toggleMoreMenu(); };
+  $('moreMenu').addEventListener('click', (e) => {
+    const item = e.target.closest('button');
+    if (item && !item.classList.contains('keep-open')) $('moreMenu').hidden = true;
+  });
   $('sizeBtn').onclick = () => { state.size = (state.size + 1) % PEN_SIZES.length; state.tool = 'pen'; updateTools(); };
   $('eraserBtn').onclick = () => { state.tool = state.tool === 'eraser' ? 'pen' : 'eraser'; updateTools(); };
   $('clearBtn').onclick = clearScreen;
@@ -1925,6 +1941,8 @@ function setupSheet() {
 
 // Android back button: returns true when handled here.
 window.handleBack = function handleBack() {
+  if (!$('moreMenu').hidden) { $('moreMenu').hidden = true; return true; }
+  if (!$('colorTray').hidden) { $('colorTray').hidden = true; return true; }
   if (!$('practice').hidden) { closePractice(); return true; }
   if (!$('handPad').hidden) { closeHandPad(); return true; }
   if (!$('quizView').hidden) { closeQuiz(); return true; }

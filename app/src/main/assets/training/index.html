@@ -173,17 +173,12 @@
       <button class="tbtn" id="eraserBtn" aria-label="Eraser">⌫</button>
       <button class="tbtn clear-btn" id="clearBtn" aria-label="Clear: erase all writing on screen">🗑 Clear</button>
     </div>
-    <div class="group">
-      <button class="tbtn" id="viewBtn" aria-label="Show whole pages">📄</button>
-      <button class="tbtn finger-btn" id="fingerBtn" aria-label="Fingers draw or scroll: tap to switch">☝ Fingers draw</button>
-      <button class="tbtn page-only" id="zoomOut" aria-label="Zoom out">－</button>
-      <button class="tbtn page-only" id="zoomIn" aria-label="Zoom in">＋</button>
-    </div>
     <div class="lang small" role="radiogroup" aria-label="Language">
       <label><input type="radio" name="lang2" value="yue" checked><span>粵</span></label>
       <label><input type="radio" name="lang2" value="cmn"><span>普</span></label>
     </div>
     <button class="primary" id="printBtn">Export</button>
+    <button class="tbtn more-btn" id="moreBtn" aria-label="More tools" aria-haspopup="menu">⋮</button>
   </header>
   <div id="hint" class="hint">Tap a stroke-order square to watch and practice that character. Tap the word at the top to hear it.</div>
   <!-- One word at a time on screen; Export / Print include every word's page -->
@@ -318,6 +313,13 @@
   <button class="pen" data-color="#212121" aria-label="Black pen"><i style="background:#212121"></i></button>
   <button class="pen" data-color="#1E88E5" aria-label="Blue pen"><i style="background:#1E88E5"></i></button>
   <button class="pen" data-color="#E53935" aria-label="Red pen"><i style="background:#E53935"></i></button>
+</div>
+<!-- Less-used worksheet tools, under ⋮ so the title bar has room for the rest at full size. -->
+<div id="moreMenu" class="bar-menu" role="menu" hidden>
+  <button id="fingerBtn" role="menuitem" aria-label="Fingers draw or scroll: tap to switch">☝ Fingers draw</button>
+  <button id="viewBtn" role="menuitem">📄 Whole pages</button>
+  <button class="page-only keep-open" id="zoomIn" role="menuitem">＋ Zoom in</button>
+  <button class="page-only keep-open" id="zoomOut" role="menuitem">－ Zoom out</button>
 </div>
 <div id="toast" class="toast" hidden></div>
 </body>

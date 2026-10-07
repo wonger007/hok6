@@ -252,8 +252,15 @@ class DownloadList(
         }, LinearLayout.LayoutParams(activity.dp(44), LinearLayout.LayoutParams.WRAP_CONTENT))
         row.addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            addView(TextView(activity).apply { setText(title); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f) })
-            addView(TextView(activity).apply { setText(note); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); alpha = 0.7f })
+            addView(TextView(activity).apply {
+                setText(title)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.text_body))
+            })
+            addView(TextView(activity).apply {
+                setText(note)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.text_small))
+                alpha = 0.7f
+            })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         container.addView(row)
     }
