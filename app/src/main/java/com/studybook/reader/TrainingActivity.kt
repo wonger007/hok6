@@ -62,7 +62,7 @@ class TrainingActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = getColor(R.color.bar_status)
+        SystemBars.setColor(this, getColor(R.color.bar_status))
         // Debug builds can be inspected from Chrome DevTools (chrome://inspect).
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
         web = WebView(this)

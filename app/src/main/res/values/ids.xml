@@ -1,3 +1,5 @@
 <resources>
     <item name="practise_selection" type="id" />
+    <item name="status_bar_color" type="id" />
+    <item name="status_bar_strip" type="id" />
 </resources>

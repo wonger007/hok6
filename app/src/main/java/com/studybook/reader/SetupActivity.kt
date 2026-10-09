@@ -22,8 +22,7 @@ class SetupActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup)
-        @Suppress("DEPRECATION")
-        window.statusBarColor = getColor(R.color.brand)
+        SystemBars.setColor(this, getColor(R.color.brand))
         // A phone on its side: a slim header, so the list has room.
         if (resources.configuration.screenHeightDp < 500) {
             findViewById<View>(R.id.setup_logo).isVisible = false

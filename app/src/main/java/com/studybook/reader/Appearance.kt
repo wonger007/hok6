@@ -13,6 +13,7 @@ class HokApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Appearance.apply(this)
+        SystemBars.install(this)
     }
 }
 
@@ -48,14 +49,12 @@ object Appearance {
 class Splash(private val view: View, private val minMs: Long = 0, private val onDone: () -> Unit = {}) {
     private val shownAt = SystemClock.uptimeMillis()
     private var finished = false
-    private val window = (view.context as? Activity)?.window
+    private val activity = view.context as? Activity
     /** The status bar matches the splash's red while it shows. */
-    @Suppress("DEPRECATION")
-    private val statusBarColor = window?.statusBarColor
+    private val statusBarColor = activity?.let { SystemBars.color(it) }
 
     init {
-        @Suppress("DEPRECATION")
-        window?.statusBarColor = view.context.getColor(R.color.brand)
+        activity?.let { SystemBars.setColor(it, it.getColor(R.color.brand)) }
         view.alpha = 1f
         view.isVisible = true
         // Never in the way for long, even if loading gets stuck.
@@ -68,8 +67,7 @@ class Splash(private val view: View, private val minMs: Long = 0, private val on
         val wait = (shownAt + minMs - SystemClock.uptimeMillis()).coerceAtLeast(0)
         view.postDelayed({
             onDone()
-            @Suppress("DEPRECATION")
-            if (statusBarColor != null) window?.statusBarColor = statusBarColor
+            if (activity != null && statusBarColor != null) SystemBars.setColor(activity, statusBarColor)
             view.animate().alpha(0f).setDuration(250).withEndAction { view.isVisible = false }.start()
         }, wait)
     }

@@ -131,7 +131,7 @@ writing characters, quiz yourself, and keep your work backed up.
 
 ## Building
 
-Requires JDK 17 and the Android SDK (platform 35).
+Requires JDK 17 and the Android SDK (platform 36).
 
 ```bash
 ./gradlew assembleRelease
@@ -144,7 +144,11 @@ One APK is built per CPU type in `app/build/outputs/apk/release/`:
 - `app-x86_64-release.apk` — the Android emulator
 
 Two apps are built: **release** ("Hok6", `app-<cpu>-release.apk`) is the one to use, and **debug**
-("Hok6 (test)", package `com.studybook.reader.debug`) installs alongside it with its own data, for automated checks.
+("Hok6 (test)", package `com.wonger.hok6.debug`) installs alongside it with its own data, for automated checks.
+
+For Google Play, `./gradlew bundleRelease` builds `app/build/outputs/bundle/release/app-release.aab`, signed with
+the upload key named in `~/.gradle/gradle.properties` (`hok6.upload.*`). Without that key, release builds are signed
+with the debug key.
 
 `test/` is a local sample book folder used for testing; it is excluded from git.
 

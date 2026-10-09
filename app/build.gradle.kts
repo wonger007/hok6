@@ -5,25 +5,27 @@ plugins {
 
 android {
     namespace = "com.studybook.reader"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.studybook.reader"
+        applicationId = "com.wonger.hok6"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 12
         versionName = "1.10"
 
     }
 
     signingConfigs {
-        // Personal sideloaded app: signed with this computer's debug key so updates install over earlier copies.
-        // Keep ~/.android/debug.keystore backed up; a different key would mean uninstalling (and losing app data) first.
-        create("personal") {
-            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        // Google Play upload key. Its location and passwords live outside the repo in ~/.gradle/gradle.properties
+        // (hok6.upload.storeFile, .storePassword, .keyAlias, .keyPassword). Back up the keystore: a lost upload key
+        // has to be reset through Play Console support.
+        create("upload") {
+            val props = project.properties
+            storeFile = (props["hok6.upload.storeFile"] as String?)?.let { file(it) }
+            storePassword = props["hok6.upload.storePassword"] as String?
+            keyAlias = props["hok6.upload.keyAlias"] as String?
+            keyPassword = props["hok6.upload.keyPassword"] as String?
         }
     }
 
@@ -34,7 +36,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("personal")
+            // Without the upload key (someone building from source), fall back to the debug key so the APK still installs.
+            val upload = signingConfigs.getByName("upload")
+            signingConfig = if (upload.storeFile?.exists() == true) upload else signingConfigs.getByName("debug")
         }
         // "Hok6 (test)": installed alongside for automated checks, with its own data and book folder.
         debug {
@@ -53,9 +57,10 @@ android {
     }
     // One APK per CPU type, so each only carries one copy of the text recogniser's native library.
     // Most tablets need the arm64-v8a APK; x86_64 is for the emulator.
+    // Off for the Google Play bundle (bundleRelease): Play splits by CPU type itself, and AGP refuses both at once.
     splits {
         abi {
-            isEnable = true
+            isEnable = gradle.startParameter.taskNames.none { it.contains("bundle", ignoreCase = true) }
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = false
