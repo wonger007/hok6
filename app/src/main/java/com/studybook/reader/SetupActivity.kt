@@ -53,6 +53,7 @@ class SetupActivity : AppCompatActivity() {
         }
         download.setOnClickListener { if (list.allReady) finishSetup() else list.downloadAll() }
         skip.setOnClickListener { finishSetup() }
+        Voices.noticeSwitch(this) { list.check() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = finishSetup()
         })
@@ -87,6 +88,34 @@ class SettingsActivity : AppCompatActivity() {
             })
         }
         download.setOnClickListener { list.downloadAll() }
+
+        // Voices: Google's engine (when installed) or the tablet's own; the list above re-checks after a change.
+        val engines = findViewById<android.widget.RadioGroup>(R.id.settings_voice_engine)
+        val hasGoogle = Voices.hasGoogle(this)
+        findViewById<android.widget.RadioButton>(R.id.voice_google).apply {
+            text = if (hasGoogle) getString(R.string.voice_engine_google, Voices.label(this@SettingsActivity, Voices.GOOGLE_TTS))
+                else getString(R.string.voice_engine_google_missing)
+            isEnabled = hasGoogle
+        }
+        Voices.tabletEngine(this)?.takeIf { it != Voices.GOOGLE_TTS }?.let {
+            findViewById<android.widget.RadioButton>(R.id.voice_device).text = getString(R.string.voice_engine_device_named, Voices.label(this, it))
+        }
+        engines.check(if (hasGoogle && Voices.useGoogle(this)) R.id.voice_google else R.id.voice_device)
+        engines.setOnCheckedChangeListener { _, id ->
+            val google = id == R.id.voice_google
+            if (google == Voices.useGoogle(this)) return@setOnCheckedChangeListener
+            Voices.setUseGoogle(this, google)
+            val name = Voices.label(this, if (google) Voices.GOOGLE_TTS else Voices.tabletEngine(this))
+            android.widget.Toast.makeText(this, getString(R.string.voice_switched, name), android.widget.Toast.LENGTH_LONG).show()
+            list.check()
+        }
+        Voices.noticeSwitch(this) {
+            engines.check(if (hasGoogle && Voices.useGoogle(this)) R.id.voice_google else R.id.voice_device)
+        }
+        findViewById<View>(R.id.settings_add_voices).setOnClickListener { Voices.install(this) }
+        findViewById<View>(R.id.settings_voice_settings).setOnClickListener {
+            runCatching { startActivity(android.content.Intent("com.android.settings.TTS_SETTINGS")) }
+        }
 
         findViewById<SwitchMaterial>(R.id.settings_remind).apply {
             isChecked = Downloads.remind(this@SettingsActivity)

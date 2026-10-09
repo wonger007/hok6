@@ -36,8 +36,8 @@ where it's shown here, search for it in the Settings search bar.
 | Setting | Where | Why |
 | --- | --- | --- |
 | **Install unknown apps** | Settings → Apps → Special app access → **Install unknown apps** → the browser or Files app you downloaded with → **Allow from this source** | Hok6 isn't on the Play Store, so Android blocks the APK otherwise. If **Play Protect** warns, tap **More details → Install anyway**. You can turn the setting off again afterwards. |
-| **Chinese voices** (text-to-speech) | Settings → System → Languages & input → **Text-to-speech output** → set the engine to **Speech Services by Google** → ⚙ → **Install voice data** → download **Chinese (Hong Kong) / 粵語** for Cantonese and **Chinese (China) / 普通话** for Mandarin | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. Hok6's **Download all** (on first start, or ⋮ → **Settings**) opens this screen for you. Without a voice, Hok6 offers to add one when you tap 🔊. |
-| **Internet (once)** | Wi-Fi on, then **Download all** on the welcome screen Hok6 shows the first time it opens (later: ⋮ → **Settings**, or Writing practice → About → **Settings…**) | Downloads the Cantonese and Mandarin handwriting models and opens Android's voice screen for any missing voice (or the Play Store, if Speech Services by Google isn't installed). The list ticks itself off when you come back. The English → Chinese dictionary is built in. After that Hok6 works offline. If you skip, Hok6 offers the download when a feature needs it (with **Don't remind me again**). |
+| **Chinese voices** (text-to-speech) | Nothing to set if **Speech Services by Google** is installed (it is on most devices): Hok6 speaks with Google's engine itself, without changing the device's own voice setting, and says so once. With internet the voices work straight away, and Google's engine downloads them for offline use in the background. **Download all** opens Google's voice download (**Chinese (Hong Kong) / 粵語** for Cantonese, **Chinese (China) / 普通话** for Mandarin) to get them sooner. | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. ⋮ → **Settings** → **Voices** switches between Google's engine and the device's own. |
+| **Internet (once)** | Wi-Fi on, then **Download all** on the welcome screen Hok6 shows the first time it opens (later: ⋮ → **Settings**, or Writing practice → About → **Settings…**) | Downloads the Cantonese and Mandarin handwriting models and opens Google's voice download for any voice not yet on the device (or the Play Store, if Speech Services by Google isn't installed). The list ticks itself off when you come back. The English → Chinese dictionary is built in. After that Hok6 works offline. If you skip, Hok6 offers the download when a feature needs it (with **Don't remind me again**). |
 | **Auto-rotate** (optional) | Quick settings → **Auto-rotate** | Turn the tablet to portrait for a full page, landscape for wider worksheets. |
 | **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. |
 
@@ -50,10 +50,10 @@ Samsung's menus differ from the ones above:
   again afterwards, but it blocks the next update the same way.
 - **Install unknown apps**: Settings → Apps → ⋮ → **Special access** → Install unknown apps → **My Files** (or Chrome)
   → Allow.
-- **Chinese voices**: Samsung tablets start with **Samsung text-to-speech**, which may have no Cantonese. Install
-  **Speech Recognition and Synthesis from Google** from the Play Store if it isn't there, then Settings → General
-  management → **Text-to-speech** → Preferred engine → **Speech Recognition and Synthesis from Google** → ⚙ → Install
-  voice data → **Chinese (Hong Kong)** and **Chinese (China)**.
+- **Chinese voices**: Samsung devices prefer **Samsung text-to-speech**, which may have no Cantonese. Hok6 uses
+  **Speech Recognition and Synthesis from Google** instead (Samsung's name for Google's engine) and leaves the
+  device's own setting alone; it tells you once when it does. If Google's engine is missing, install it from the Play
+  Store.
 - **Book on a microSD card**: when choosing the book folder, tap ☰ in the folder picker and pick the SD card (e.g.
   SD card → Download → *your book*). Hok6 reads it and keeps its backup there just like on the tablet's own storage.
 - **Saving a worksheet as PDF**: Samsung asks for a folder in **My Files** (e.g. Download) and then **Done**; the file
@@ -122,8 +122,9 @@ writing characters, quiz yourself, and keep your work backed up.
     WhatsApp, blank or with your writing;
   - on phones, one character at a time with big squares (detected automatically).
 - **Welcome screen and Settings**: the first time Hok6 opens it shows what it needs from the internet (handwriting
-  recognition and voices) with **Download all** and **Skip**. ⋮ → **Settings** has the same list any time, the
-  download reminders switch, light or dark, and the welcome screen again.
+  recognition and voices) with **Download all** and **Skip**. ⋮ → **Settings** has the same list any time (a voice
+  that so far only works online is marked as such), which voice engine to speak with, the download reminders switch,
+  light or dark, and the welcome screen again.
 - **Light or dark**: ⋮ → **Settings** → *Same as the tablet* (the default), *Light* or *Dark*;
   writing practice follows it too. While Hok6 starts (and while writing practice loads) a splash shows its name, tag
   line and a progress bar.

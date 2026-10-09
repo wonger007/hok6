@@ -143,7 +143,7 @@ class TrainingActivity : AppCompatActivity() {
     /** Offers to add the voice, once per visit to this screen; a short note otherwise (or once reminders are off). */
     private fun voiceMissing(lang: String) {
         if (Downloads.remind(this) && askedVoice.add(lang)) {
-            Downloads.ask(this, Downloads.Need.VOICE, lang) { Voices.install(this, tts?.defaultEngine) }
+            Downloads.ask(this, Downloads.Need.VOICE, lang) { Voices.install(this) }
             return
         }
         val name = getString(if (lang == "yue") R.string.cantonese else R.string.mandarin)
@@ -217,9 +217,16 @@ class TrainingActivity : AppCompatActivity() {
 
         /** [rate] 1 is normal speed; lower is slower. */
         @JavascriptInterface
-        fun speakAt(text: String, lang: String, rate: Float) = runOnUiThread {
+        fun speakAt(text: String, lang: String, rate: Float): Unit = runOnUiThread {
+            // The first time, say that Hok6 speaks with Google's voices rather than the tablet's own engine.
+            if (Voices.needsNotice(this@TrainingActivity)) {
+                return@runOnUiThread Voices.noticeSwitch(this@TrainingActivity) {
+                    if (!Voices.useGoogle(this@TrainingActivity)) { tts?.shutdown(); tts = null; ttsReady = false }
+                    speakAt(text, lang, rate)
+                }
+            }
             if (tts == null) {
-                tts = TextToSpeech(this@TrainingActivity) { status ->
+                tts = Voices.open(this@TrainingActivity) { status ->
                     ttsReady = status == TextToSpeech.SUCCESS
                     pendingSpeech?.let { (t, l, r) -> if (ttsReady) speakNow(t, l, r) }
                     pendingSpeech = null

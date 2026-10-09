@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.util.TypedValue
 import android.view.Gravity
@@ -23,6 +24,63 @@ import java.util.Locale
 /** The Chinese voices Hok6 speaks with, best first: [lang] "yue" (Cantonese) or "cmn" (Mandarin). */
 object Voices {
     const val GOOGLE_TTS = "com.google.android.tts"
+    private const val KEY_ENGINE = "voice_engine"
+    private const val KEY_NOTICED = "voice_engine_noticed"
+
+    fun hasGoogle(context: Context) = runCatching { context.packageManager.getPackageInfo(GOOGLE_TTS, 0) }.isSuccess
+
+    /** Whether Hok6 speaks with Google's engine (the default) rather than the tablet's preferred one. */
+    fun useGoogle(context: Context) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_ENGINE, "google") != "device"
+
+    fun setUseGoogle(context: Context, on: Boolean) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit().putString(KEY_ENGINE, if (on) "google" else "device").apply()
+
+    /**
+     * The engine Hok6 speaks with: Google's when it's installed, so Cantonese works without changing the tablet's
+     * preferred engine (Samsung's often has none), unless the tablet's own was chosen in Settings.
+     */
+    fun engine(context: Context): String? = when {
+        useGoogle(context) && hasGoogle(context) -> GOOGLE_TTS
+        else -> tabletEngine(context)
+    }
+
+    /** The tablet's preferred voice engine, as set in Android's voice settings. */
+    fun tabletEngine(context: Context): String? = Settings.Secure.getString(context.contentResolver, "tts_default_synth")
+
+    /** An engine's name as the tablet shows it, e.g. "Samsung text-to-speech engine". */
+    fun label(context: Context, engine: String?): String {
+        val pm = context.packageManager
+        return engine?.let { runCatching { pm.getApplicationLabel(pm.getApplicationInfo(it, 0)).toString() }.getOrNull() }
+            ?: context.getString(R.string.voice_engine_device)
+    }
+
+    /** Whether [noticeSwitch] still has something to say. */
+    fun needsNotice(context: Context) =
+        !context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_NOTICED, false) &&
+            engine(context) == GOOGLE_TTS && tabletEngine(context).let { it != null && it != GOOGLE_TTS }
+
+    /**
+     * Once: when Hok6 speaks with Google's engine while the tablet prefers another (often Samsung's), says so and
+     * offers the tablet's instead. [then] runs once it's closed (or straight away when there's nothing to say).
+     */
+    fun noticeSwitch(activity: AppCompatActivity, then: () -> Unit = {}) {
+        if (!needsNotice(activity) || activity.isFinishing) return then()
+        activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_NOTICED, true).apply()
+        val google = label(activity, GOOGLE_TTS)
+        val tablet = label(activity, tabletEngine(activity))
+        MaterialAlertDialogBuilder(activity)
+            .setTitle(R.string.voice_switch_title)
+            .setMessage(activity.getString(R.string.voice_switch, google, tablet))
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(R.string.voice_switch_use) { _, _ -> setUseGoogle(activity, false) }
+            .setOnDismissListener { then() }
+            .show()
+    }
+
+    /** Starts the voice engine Hok6 speaks with ([engine]). */
+    fun open(context: Context, onInit: TextToSpeech.OnInitListener): TextToSpeech =
+        engine(context)?.let { TextToSpeech(context, onInit, it) } ?: TextToSpeech(context, onInit)
 
     fun locales(lang: String) =
         if (lang == "yue") listOf(Locale("yue", "HK"), Locale("zh", "HK"))
@@ -32,15 +90,30 @@ object Voices {
         locales(lang).firstOrNull { engine.isLanguageAvailable(it) >= TextToSpeech.LANG_AVAILABLE }
 
     /**
-     * Opens the screen where voices can be added: Google's voice data, Android's voice settings (to pick Google's
-     * engine first), or the Play Store (to get it). Android doesn't let apps install voices themselves.
-     * [engine] is the engine in use, from [TextToSpeech.getDefaultEngine].
+     * Whether [lang] can be spoken without the internet. Google's engine reports a language as available when it can
+     * stream it, so this looks for a voice that is installed on the device. Engines that don't list voices count as
+     * installed.
      */
-    fun install(activity: AppCompatActivity, engine: String?) {
-        val hasGoogle = runCatching { activity.packageManager.getPackageInfo(GOOGLE_TTS, 0) }.isSuccess
+    fun installed(engine: TextToSpeech, lang: String): Boolean {
+        val voices = runCatching { engine.voices }.getOrNull().orEmpty()
+        if (voices.isEmpty()) return true
+        val wanted = locales(lang)
+        return voices.any { v ->
+            wanted.any { it.language == v.locale.language && it.country == v.locale.country } &&
+                !v.isNetworkConnectionRequired && TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in v.features
+        }
+    }
+
+    /**
+     * Opens the screen where voices can be added: Google's voice download (when Hok6 speaks with Google's engine),
+     * Android's voice settings (when it uses the tablet's own engine), or the Play Store (to get Google's).
+     * Android doesn't let apps install voices themselves.
+     */
+    fun install(activity: AppCompatActivity) {
+        val hasGoogle = hasGoogle(activity)
         val (intent, tip) = when {
             !hasGoogle -> Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$GOOGLE_TTS")) to R.string.voice_get_google
-            engine != GOOGLE_TTS -> Intent("com.android.settings.TTS_SETTINGS") to R.string.voice_pick_google
+            engine(activity) != GOOGLE_TTS -> Intent("com.android.settings.TTS_SETTINGS") to R.string.voice_pick_google
             else -> Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).setPackage(GOOGLE_TTS) to R.string.voice_pick_voices
         }
         val fallback = if (hasGoogle) Intent("com.android.settings.TTS_SETTINGS")
@@ -138,12 +211,11 @@ class DownloadList(
     private val container: LinearLayout,
     private val onChange: (allReady: Boolean, checking: Boolean, downloading: Boolean) -> Unit = { _, _, _ -> },
 ) : DefaultLifecycleObserver {
-    private enum class State { CHECKING, MISSING, DOWNLOADING, READY, FAILED }
+    private enum class State { CHECKING, MISSING, ONLINE, DOWNLOADING, READY, FAILED }
 
     private val hand = Downloads.LANGS.associateWith { State.CHECKING }.toMutableMap()
     private val voice = Downloads.LANGS.associateWith { State.CHECKING }.toMutableMap()
     private var tts: TextToSpeech? = null
-    private var engine: String? = null
 
     init {
         activity.lifecycle.addObserver(this)
@@ -177,12 +249,15 @@ class DownloadList(
         tts?.shutdown()
         Downloads.LANGS.forEach { voice[it] = State.CHECKING }
         var engineHere: TextToSpeech? = null
-        engineHere = TextToSpeech(activity) { status ->
-            val e = engineHere ?: return@TextToSpeech
-            if (e !== tts) return@TextToSpeech
-            engine = e.defaultEngine
+        engineHere = Voices.open(activity) { status ->
+            val e = engineHere ?: return@open
+            if (e !== tts) return@open
             for (lang in Downloads.LANGS) {
-                voice[lang] = if (status == TextToSpeech.SUCCESS && Voices.find(e, lang) != null) State.READY else State.MISSING
+                voice[lang] = when {
+                    status != TextToSpeech.SUCCESS || Voices.find(e, lang) == null -> State.MISSING
+                    Voices.installed(e, lang) -> State.READY
+                    else -> State.ONLINE
+                }
             }
             render()
         }
@@ -198,7 +273,7 @@ class DownloadList(
             Downloads.downloadHandwriting(lang) { done(lang, it) }
         }
         render()
-        if (voice.values.any { it == State.MISSING }) Voices.install(activity, engine)
+        if (voice.values.any { it == State.MISSING || it == State.ONLINE }) Voices.install(activity)
     }
 
     private fun done(lang: String, error: Throwable?) {
@@ -228,6 +303,7 @@ class DownloadList(
     private fun voiceNote(state: State?) = when (state) {
         State.READY -> R.string.need_ready
         State.MISSING -> R.string.need_voice_missing
+        State.ONLINE -> R.string.need_voice_online
         else -> R.string.need_checking
     }
 
@@ -235,7 +311,7 @@ class DownloadList(
         val mark = when (state) {
             State.READY -> "✅"
             State.DOWNLOADING -> "⏳"
-            State.MISSING -> "⬇️"
+            State.MISSING, State.ONLINE -> "⬇️"
             State.FAILED -> "⚠️"
             else -> "…"
         }

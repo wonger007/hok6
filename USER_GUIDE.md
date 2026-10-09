@@ -136,6 +136,9 @@ Main screen ⋮ → **Settings**:
 
 - **Downloads**: the handwriting models and Chinese voices Hok6 uses, with **Download all**. Needed once, with
   internet; after that Hok6 works offline.
+- **Voices**: which engine Hok6 speaks with: Google's (recommended; it has Cantonese and Mandarin) or the device's
+  own. Changing it here doesn't change the device's voice setting for other apps. **Add Chinese voices…** opens
+  Google's voice download; **Android voice settings…** opens the device's own.
 - **Download reminders**: whether Hok6 offers a download when a feature needs one.
 - **Light or dark**: *Same as the tablet* (the default), *Light* or *Dark*. Writing practice follows it too.
 - **Welcome screen**: shows the first-start screen again.
@@ -145,6 +148,7 @@ Main screen ⋮ → **Settings**:
 - **Hand on the screen:** use a stylus once and only the stylus writes; fingers scroll and zoom.
 - **Portrait or landscape:** turn the tablet to portrait for a full page, landscape for wider worksheets. Tracing
   stays in place either way.
-- **No sound from 🔊:** a Chinese voice isn't installed. Hok6 offers to add one, or see *Chinese voices* in the
-  README's [device settings](README.md#device-settings).
+- **No sound from 🔊:** without internet, a voice only works once it's downloaded. Connect to Wi-Fi, or ⋮ →
+  **Settings** → **Voices** → **Add Chinese voices…**. See also *Chinese voices* in the README's
+  [device settings](README.md#device-settings).
 - **Text size:** Hok6 follows Android's font size setting, and is already a step bigger on tablets.

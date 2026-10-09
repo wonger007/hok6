@@ -52,6 +52,53 @@
 
         <TextView
             style="@style/SettingsHeader"
+            android:text="@string/settings_voices" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:alpha="0.7"
+            android:text="@string/voice_engine_note"
+            android:textSize="@dimen/text_small" />
+
+        <RadioGroup
+            android:id="@+id/settings_voice_engine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <RadioButton
+                android:id="@+id/voice_google"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="@string/voice_engine_google"
+                android:textSize="@dimen/text_body" />
+
+            <RadioButton
+                android:id="@+id/voice_device"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="@string/voice_engine_device"
+                android:textSize="@dimen/text_body" />
+        </RadioGroup>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/settings_add_voices"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/voice_add" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/settings_voice_settings"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/voice_android_settings" />
+
+        <TextView
+            style="@style/SettingsHeader"
             android:text="@string/settings_reminders" />
 
         <com.google.android.material.switchmaterial.SwitchMaterial
