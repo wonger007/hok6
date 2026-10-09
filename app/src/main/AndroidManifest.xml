@@ -59,6 +59,16 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- ML Kit's usage logging goes through Google's datatransport library; without its upload backend nothing
+             is sent and queued logs are dropped. Recognition runs on the device either way. -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="merge">
+            <meta-data
+                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+                tools:node="remove" />
+        </service>
+
         <service
             android:name=".PlaybackService"
             android:exported="true"
