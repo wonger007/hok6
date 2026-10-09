@@ -11,6 +11,11 @@ Hok6 (學, *hok6* in Jyutping: to learn, to study, to imitate) is an Android tab
 2. Open the downloaded file and allow installing from that source when Android asks. Android 8.0 or newer is needed.
    A new version installs over the old one and keeps your work.
 
+**Coming from 1.10 or earlier?** From 1.11 Hok6 has a new package name (`com.wonger.hok6`, for Google Play), so it
+installs as a second Hok6 next to the old one instead of replacing it. Your work comes across through
+`Hok6 backup.json` in your book folder: in the new Hok6, choose the same book folder and tap **Restore** when it
+offers (or old Hok6 ⋮ → **Back up my work…**, then new Hok6 ⋮ → **Restore my work…**). Then uninstall the old one.
+
 ### Tested devices
 
 Hok6 has been tested only on:
@@ -19,6 +24,7 @@ Hok6 has been tested only on:
 | --- | --- | --- |
 | Samsung Galaxy Tab S7 FE 5G | 14 | Tablet layout; book on the microSD card |
 | Razer Edge WiFi | 12 | Phone layout (its screen is under 600dp at its narrowest) |
+| Samsung Galaxy S25 Ultra | 17 | Phone layout; Android 15+ full-screen (edge-to-edge) layout |
 
 It should work on other phones and tablets with Android 8.0 or newer, but they haven't been tried.
 
