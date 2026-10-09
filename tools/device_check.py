@@ -44,7 +44,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "build", "device-check")
-PACKAGE = "com.studybook.reader.debug"
+PACKAGE = "com.wonger.hok6.debug"
 MAIN = PACKAGE + "/com.studybook.reader.MainActivity"
 DEVICE_BOOK = "/sdcard/Download/StudyBookCheck"
 DEVTOOLS_PORT = 9333
@@ -138,7 +138,16 @@ class Device:
 def devtools_eval(device, expression, timeout=30):
     pid = device.shell(f"pidof {PACKAGE}").strip().split()[0]
     device.run("forward", f"tcp:{DEVTOOLS_PORT}", f"localabstract:webview_devtools_remote_{pid}")
-    pages = json.load(urllib.request.urlopen(f"http://127.0.0.1:{DEVTOOLS_PORT}/json", timeout=10))
+    try:
+        pages = json.load(urllib.request.urlopen(f"http://127.0.0.1:{DEVTOOLS_PORT}/json", timeout=10))
+    except OSError as e:
+        if device.adb[0] == WINDOWS_ADB:
+            # Not a failed check: the rest can't run this way, so stop with what to do (checks retry other errors).
+            raise SystemExit("\nstopping: the writing-practice checks look inside the app through a port that Windows' "
+                             "adb opens on Windows only. Set networkingMode=mirrored under [wsl2] in "
+                             "%USERPROFILE%\\.wslconfig and run `wsl --shutdown` (then WSL sees it), or attach the device "
+                             "with usbipd instead.") from e
+        raise
     page = next(p for p in pages if p.get("type") == "page")
     url = page["webSocketDebuggerUrl"]
     host, port_path = url[len("ws://"):].split(":", 1)
@@ -192,12 +201,22 @@ def devtools_eval(device, expression, timeout=30):
 
 # ---- the checks
 
-def find_adb():
+WINDOWS_ADB = os.path.join(ROOT, "tools", "adbw")
+
+
+def find_adb(use_emulator):
+    """The adb to use, and whether it's Windows' one. In WSL with Google's platform tools unzipped to C:\\platform-tools,
+    a device plugged into the PC goes through Windows' adb (tools/adbw): no usbipd, and large copies don't stall.
+    Emulators run inside WSL, so they use the Linux adb."""
+    if not use_emulator and os.path.exists("/mnt/c/platform-tools/adb.exe"):
+        ready, unauthorized = adb_devices(WINDOWS_ADB)
+        if ready or unauthorized:
+            return WINDOWS_ADB, True
     sdk = os.environ.get("ANDROID_HOME", "/opt/android-sdk")
     for candidate in (os.path.join(sdk, "platform-tools", "adb"), "adb"):
         try:
             subprocess.run([candidate, "version"], capture_output=True, check=True)
-            return candidate
+            return candidate, False
         except (OSError, subprocess.CalledProcessError):
             pass
     sys.exit("adb not found: install the Android platform tools or set ANDROID_HOME")
@@ -266,12 +285,12 @@ def start_emulator(adb, avd):
     return serial
 
 
-def choose_device(adb, serial, connect, use_emulator, avd):
+def choose_device(adb, serial, connect, use_emulator, avd, windows=False):
     """A real device when one is connected and ready, otherwise an emulator. Returns (serial, started_emulator)."""
     if connect:
         subprocess.run([adb, "connect", connect], check=False)
         serial = serial or connect
-    if not use_emulator:
+    if not use_emulator and not windows:
         attach_usb_device(adb)
     ready, unauthorized = adb_devices(adb)
     if serial:
@@ -403,8 +422,8 @@ def main():
     if not os.path.isdir(args.book):
         sys.exit(f"book folder {args.book} not found")
 
-    adb = find_adb()
-    serial, started_emulator = choose_device(adb, args.serial, args.connect, args.emulator, args.avd)
+    adb, windows = find_adb(args.emulator)
+    serial, started_emulator = choose_device(adb, args.serial, args.connect, args.emulator, args.avd, windows)
     device = Device(adb, serial)
     model = device.shell("getprop ro.product.model").strip()
     android = device.shell("getprop ro.build.version.release").strip()

@@ -205,9 +205,32 @@ One-time setup for a USB device (e.g. Razer Edge) with this project in WSL:
 3. Run the check; it attaches the device to WSL itself. The first time, the device asks
    **"Allow USB debugging?"** — tick **Always allow from this computer** and tap **Allow**.
 
+Faster and steadier with WSL: let Windows talk to the device instead of passing USB through. Unzip Google's
+[platform tools for Windows](https://developer.android.com/tools/releases/platform-tools) to `C:\platform-tools` and
+copy `~/.android/adbkey` to `%USERPROFILE%\.android\` (so devices that already allowed this computer don't ask again).
+With a device plugged in and not attached to WSL (`usbipd detach --busid …`), `tools/adbw` works like `adb` and
+`device_check.py` uses it by itself: large copies don't stall the way they can over usbipd. The writing-practice checks
+also need `networkingMode=mirrored` under `[wsl2]` in `%USERPROFILE%\.wslconfig` (then `wsl --shutdown`), because they
+reach the app through a port that Windows' adb opens on Windows.
+
 Wireless instead of USB (Android 11+): Developer options → **Wireless debugging** → *Pair device with pairing code*,
 then `adb pair IP:PORT CODE` once and `python3 tools/device_check.py --connect IP:PORT`
 (the port changes when wireless debugging is turned off and on).
+
+## License
+
+Hok6's own code is © 2026 wonger and licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE).
+
+The data and libraries it bundles keep their own licenses (listed under Credits below):
+
+- **Stroke order data** (`app/src/main/assets/hanzi.bin`): Arphic Public License.
+- **English → Chinese dictionary** (`app/src/main/assets/training/dict/`): adapted (selected and reformatted) from
+  CC-CEDICT and CC-Canto, and shared under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **Readings** (`app/src/main/assets/training/readings/`): Jyutping from rime-cantonese (CC BY 4.0), and Pinyin and
+  fallback Jyutping from the Unicode Unihan database (Unicode License V3,
+  [UNICODE-LICENSE.txt](app/src/main/assets/training/UNICODE-LICENSE.txt)).
+
+`test/` (a personal textbook used for testing) is not part of the repository.
 
 ## Credits
 

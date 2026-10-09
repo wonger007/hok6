@@ -1,0 +1,37 @@
+#!/bin/bash
+# adb for WSL that runs Google's platform tools on Windows (C:\platform-tools\adb.exe, or $ADB_EXE), so Windows talks
+# to USB devices with its own driver: no usbipd, and no copies that stall halfway. Use it like adb.
+# Linux paths of local files are turned into Windows paths for the commands that read or write them.
+EXE=${ADB_EXE:-/mnt/c/platform-tools/adb.exe}
+[ -x "$EXE" ] || { echo "adbw: $EXE not found (unzip Google's platform-tools for Windows to C:\\platform-tools)" >&2; exit 1; }
+
+windows_path() {
+    if [ -e "$1" ]; then wslpath -w "$1"
+    elif [ -d "$(dirname "$1")" ]; then echo "$(wslpath -w "$(dirname "$1")")\\$(basename "$1")"   # a file pull creates
+    else echo "$1"
+    fi
+}
+
+args=(); command=""; skip=0
+for a in "$@"; do
+    if [ "$skip" = 1 ]; then args+=("$a"); skip=0; continue; fi
+    if [ -z "$command" ]; then
+        case "$a" in
+            -s|-t|-H|-P|-L) skip=1 ;;
+            -*) ;;
+            *) command=$a ;;
+        esac
+        args+=("$a"); continue
+    fi
+    case "$command" in
+        push|install|install-multiple|sideload)
+            # Local files are everything but the device path at the end of a push.
+            if [[ "$a" != -* && ( "$command" != push || -e "$a" ) ]]; then args+=("$(windows_path "$a")"); else args+=("$a"); fi ;;
+        pull)
+            # The device path comes first; anything after it is the local destination.
+            if [[ "$a" != -* && "$pulled_from" == 1 ]]; then args+=("$(windows_path "$a")")
+            else [[ "$a" != -* ]] && pulled_from=1; args+=("$a"); fi ;;
+        *) args+=("$a") ;;
+    esac
+done
+exec "$EXE" "${args[@]}"

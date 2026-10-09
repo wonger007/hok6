@@ -1,0 +1,15 @@
+Hok6
+Copyright 2026 wonger
+
+Hok6's own code is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The app also bundles data and code from other projects, each under its own license (see the Credits and License
+sections of README.md):
+- Stroke order data from hanzi-writer-data / Make Me a Hanzi, derived from fonts by Arphic Technology:
+  Arphic Public License (app/src/main/assets/training/ARPHICPL.TXT).
+- Hanzi Writer: MIT License (app/src/main/assets/training/HANZI-WRITER-LICENSE.txt).
+- English → Chinese dictionary data adapted from CC-CEDICT (CC BY-SA 4.0) and CC-Canto (CC BY-SA 3.0): the bundled
+  dictionary files in app/src/main/assets/training/dict/ are shared under CC BY-SA 4.0.
+- Jyutping readings from rime-cantonese: CC BY 4.0.
+- Readings and character data from the Unicode Unihan database: Unicode License V3
+  (app/src/main/assets/training/UNICODE-LICENSE.txt).
