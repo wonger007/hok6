@@ -219,7 +219,7 @@ then `adb pair IP:PORT CODE` once and `python3 tools/device_check.py --connect I
 
 ## License
 
-Hok6's own code is © 2026 wonger and licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE).
+Hok6's own code is © 2026 wonger007 and licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE).
 
 The data and libraries it bundles keep their own licenses (listed under Credits below):
 
