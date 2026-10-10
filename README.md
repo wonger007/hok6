@@ -6,6 +6,8 @@ Hok6 (學, *hok6* in Jyutping: to learn, to study, to imitate) is an Android tab
 
 ## Install
 
+**Help test Hok6 on Google Play:** see [Test Hok6](TESTING.md). Or install the APK from GitHub:
+
 1. On the Android tablet or phone, open the [latest release](https://github.com/wonger007/hok6/releases/latest) and
    download `Hok6-<version>-arm64-v8a.apk` (use `armeabi-v7a` only on an old 32-bit device).
 2. Open the downloaded file and allow installing from that source when Android asks. Android 8.0 or newer is needed.
