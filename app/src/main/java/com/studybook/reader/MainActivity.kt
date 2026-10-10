@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity() {
         list.adapter = adapter
         choose = findViewById(R.id.choose)
         opening = findViewById(R.id.opening)
-        choose.setOnClickListener { pickFolder.launch(treeUri ?: DOWNLOADS) }
+        choose.setOnClickListener { askForFolder() }
 
         treeUri = prefs.getString(BookFolder.KEY_ROOT, null)?.let(Uri::parse)?.takeIf { uri ->
             contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
@@ -149,10 +149,38 @@ class MainActivity : AppCompatActivity() {
         return super.onPrepareOptionsMenu(menu)
     }
 
+    /**
+     * Before Android's folder picker (which has no Cancel button of its own): says what comes next and how to go back,
+     * with the current book folder when there is one, and a Cancel here too.
+     */
+    private fun askForFolder() {
+        val current = treeUri
+        val message = if (current == null) getString(R.string.folder_ask_first)
+            else getString(R.string.folder_ask_change, folderPath(current))
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (current == null) R.string.folder_ask_first_title else R.string.folder_ask_change_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.folder_choose) { _, _ ->
+                pickFolder.launch(current ?: DOWNLOADS)
+                Toast.makeText(this, R.string.folder_back_cancels, Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** A book folder as people know it, e.g. "SD card › Download › Cantonese". */
+    private fun folderPath(uri: Uri): String {
+        val id = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull() ?: return uri.toString()
+        val volume = id.substringBefore(':')
+        val where = getString(if (volume == "primary") R.string.storage_internal else R.string.storage_sd)
+        return (listOf(where) + id.substringAfter(':', "").split('/').filter { it.isNotEmpty() })
+            .joinToString(getString(R.string.path_separator))
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             android.R.id.home -> finish()
-            R.id.change_folder -> pickFolder.launch(treeUri ?: DOWNLOADS)
+            R.id.change_folder -> askForFolder()
             R.id.writing_practice -> startActivity(Intent(this, TrainingActivity::class.java))
             R.id.new_folder -> newFolder()
             R.id.back_up -> backup.backUp()

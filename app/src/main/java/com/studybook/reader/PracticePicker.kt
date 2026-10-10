@@ -20,6 +20,8 @@ object PracticePicker {
         activity: Activity,
         characters: List<String>,
         preselected: Set<String>,
+        /** Where the characters come from, e.g. "From page 2 of 3 only, not the whole file". */
+        scope: String,
         recognised: Boolean = false,
         onPractise: (List<String>) -> Unit,
     ) {
@@ -39,7 +41,16 @@ object PracticePicker {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setPadding(0, (4 * dp).toInt(), 0, (12 * dp).toInt())
         }
+        // Says plainly that these are the characters of this page (or paragraph), not of the whole file.
+        val from = TextView(activity).apply {
+            text = scope
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(androidx.core.content.ContextCompat.getColor(activity, R.color.brand_text))
+            setPadding(0, (4 * dp).toInt(), 0, 0)
+        }
         root.addView(title)
+        root.addView(from)
         root.addView(hint)
 
         val chips = ChipGroup(activity)

@@ -74,6 +74,7 @@ class ChapterActivity : AppCompatActivity() {
     private lateinit var fileTools: View
     private lateinit var practiseButton: TextView
     private lateinit var penButton: ImageButton
+    private lateinit var sizeButton: ImageButton
     private lateinit var eraserButton: ImageButton
     private lateinit var ink: Ink
     private lateinit var pdf: PdfViewer
@@ -114,6 +115,7 @@ class ChapterActivity : AppCompatActivity() {
         practiseButton = findViewById(R.id.practise_mode)
         eraserButton = findViewById(R.id.ink_eraser)
         penButton = findViewById(R.id.ink_pen)
+        sizeButton = findViewById(R.id.ink_size)
         // Files open ready to write on; Practice mode switches tapping to choosing characters instead.
         ink = Ink(this).apply {
             active = true
@@ -191,6 +193,10 @@ class ChapterActivity : AppCompatActivity() {
         menu.findItem(R.id.writing_practice).isVisible = current == null
         menu.findItem(R.id.move_files).isVisible = files.isNotEmpty()
         menu.findItem(R.id.save_traced).isVisible = current?.kind == Kind.PDF
+        menu.findItem(R.id.fingers_draw).apply {
+            isVisible = current?.kind == Kind.PDF || current?.kind == Kind.DOCX
+            isChecked = !ink.stylusSeen
+        }
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -200,6 +206,7 @@ class ChapterActivity : AppCompatActivity() {
             R.id.open_external -> current?.let { openExternal(it) }
             R.id.move_files -> startSelection(null)
             R.id.save_traced -> saveTraced()
+            R.id.fingers_draw -> setFingersDraw(ink.stylusSeen) // switches: on when only the stylus draws now
             R.id.writing_practice -> when {
                 current?.kind == Kind.PDF && pdfFrame.isVisible -> practice.pickFromPdf(pdf.middlePage, null, null)
                 current?.kind == Kind.DOCX && docxFrame.isVisible -> practice.pickAllFromDocx()
@@ -524,7 +531,23 @@ class ChapterActivity : AppCompatActivity() {
         invalidateOptionsMenu()
     }
 
+    /** Fingers draw (as before a stylus is used), or only the stylus does and fingers scroll. */
+    private fun setFingersDraw(on: Boolean) {
+        ink.stylusSeen = !on
+        Toast.makeText(this, if (on) R.string.fingers_draw_on else R.string.fingers_draw_off, Toast.LENGTH_SHORT).show()
+    }
+
     private fun setupInkTools() {
+        // Once a stylus has been used, a finger only scrolls: the first time one touches the page, say how to draw with
+        // fingers again (the stylus may be lost or flat).
+        var fingerHinted = false
+        ink.onFingerIgnored = {
+            if (!fingerHinted) {
+                fingerHinted = true
+                message(getString(R.string.fingers_hint)).setAction(R.string.fingers_let) { setFingersDraw(true) }
+                    .setDuration(8000).show()
+            }
+        }
         // Writing is always on, except in Practice mode, where a tap chooses a character to practice.
         practiseButton.setOnClickListener {
             ink.practising = !ink.practising
@@ -538,13 +561,7 @@ class ChapterActivity : AppCompatActivity() {
             leavePractice()
             updateInkTools()
         }
-        findViewById<View>(R.id.ink_size).setOnClickListener {
-            val sizes = Ink.PEN_SIZES
-            ink.widthDp = sizes[(sizes.indexOfFirst { it == ink.widthDp } + 1) % sizes.size]
-            ink.tool = InkTool.PEN
-            leavePractice()
-            updateInkTools()
-        }
+        sizeButton.setOnClickListener { showSizes() }
         findViewById<View>(R.id.ink_clear).setOnClickListener { askClear() }
         updateInkTools()
     }
@@ -643,13 +660,15 @@ class ChapterActivity : AppCompatActivity() {
         val writing = !ink.practising
         penButton.setBackgroundResource(
             if (writing && ink.tool == InkTool.PEN) R.drawable.bar_selected else R.drawable.bar_button)
-        // The dot shows the pen's colour and size.
+        // The dot shows the pen's colour; the thickness button, a line as thick as the pen.
         penButton.imageTintList = null // the bar's icon colour would turn the dot white
         penButton.setImageDrawable(colourDot(ink.color))
-        // The 48dp button less the padding leaves a 12, 20 or 28dp dot.
-        val pad = ((18 - 4 * Ink.PEN_SIZES.indexOfFirst { it == ink.widthDp }) * ink.density).toInt()
+        val pad = (14 * ink.density).toInt()
         penButton.scaleType = ImageView.ScaleType.FIT_CENTER
         penButton.setPadding(pad, pad, pad, pad)
+        sizeButton.imageTintList = null
+        sizeButton.scaleType = ImageView.ScaleType.CENTER
+        sizeButton.setImageDrawable(LineIcon(ink.widthDp * ink.density, 26 * ink.density))
         eraserButton.setBackgroundResource(
             if (writing && ink.tool == InkTool.ERASER) R.drawable.bar_selected else R.drawable.bar_button)
     }
@@ -695,6 +714,60 @@ class ChapterActivity : AppCompatActivity() {
             })
         }
         popup.showAsDropDown(penButton, 0, (6 * dp).toInt())
+    }
+
+    /** The pen thicknesses, opening under the thickness button like the colours; choosing one goes back to writing. */
+    private fun showSizes() {
+        val dp = ink.density
+        val tray = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = ContextCompat.getDrawable(this@ChapterActivity, R.drawable.color_tray_bg)
+            val pad = (6 * dp).toInt()
+            setPadding(pad, pad, pad, pad)
+        }
+        val popup = PopupWindow(tray, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        popup.elevation = 8 * dp
+        val names = listOf(R.string.pen_thin, R.string.pen_medium, R.string.pen_thick)
+        Ink.PEN_SIZES.forEachIndexed { i, width ->
+            tray.addView(ImageButton(this).apply {
+                contentDescription = getString(names[i])
+                setImageDrawable(LineIcon(width * dp, 30 * dp))
+                scaleType = ImageView.ScaleType.CENTER
+                setBackgroundResource(
+                    if (ink.tool == InkTool.PEN && ink.widthDp == width) R.drawable.bar_selected else R.drawable.bar_button)
+                setOnClickListener {
+                    ink.widthDp = width
+                    ink.tool = InkTool.PEN
+                    leavePractice()
+                    updateInkTools()
+                    popup.dismiss()
+                }
+            }, LinearLayout.LayoutParams((52 * dp).toInt(), (52 * dp).toInt()).apply {
+                val m = (4 * dp).toInt()
+                setMargins(m, m, m, m)
+            })
+        }
+        popup.showAsDropDown(sizeButton, 0, (6 * dp).toInt())
+    }
+
+    /** A white line [thickness] px thick and [length] px long, with round ends: how thick the pen writes. */
+    private class LineIcon(private val thickness: Float, private val length: Float) : android.graphics.drawable.Drawable() {
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            strokeWidth = thickness
+            strokeCap = android.graphics.Paint.Cap.ROUND
+        }
+        override fun getIntrinsicWidth() = length.toInt()
+        override fun getIntrinsicHeight() = length.toInt()
+        override fun draw(canvas: android.graphics.Canvas) {
+            val y = bounds.exactCenterY()
+            val inset = thickness / 2
+            canvas.drawLine(bounds.left + inset, y, bounds.right - inset, y, paint)
+        }
+        override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) { paint.colorFilter = colorFilter }
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
     }
 
     /** The title bar's text colour (from the layout), for the Practice button when it's off. */

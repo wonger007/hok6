@@ -39,7 +39,7 @@ where it's shown here, search for it in the Settings search bar.
 | **Chinese voices** (text-to-speech) | Nothing to set if **Speech Services by Google** is installed (it is on most devices): Hok6 speaks with Google's engine itself, without changing the device's own voice setting, and says so once. With internet the voices work straight away, and Google's engine downloads them for offline use in the background. **Download all** opens Google's voice download (**Chinese (Hong Kong) / 粵語** for Cantonese, **Chinese (China) / 普通话** for Mandarin) to get them sooner. | The 🔊 buttons and the **Sound → Chinese** quiz speak with these voices. ⋮ → **Settings** → **Voices** switches between Google's engine and the device's own. |
 | **Internet (once)** | Wi-Fi on, then **Download all** on the welcome screen Hok6 shows the first time it opens (later: ⋮ → **Settings**, or Writing practice → About → **Settings…**) | Downloads the Cantonese and Mandarin handwriting models and opens Google's voice download for any voice not yet on the device (or the Play Store, if Speech Services by Google isn't installed). The list ticks itself off when you come back. The English → Chinese dictionary is built in. After that Hok6 works offline. If you skip, Hok6 offers the download when a feature needs it (with **Don't remind me again**). |
 | **Auto-rotate** (optional) | Quick settings → **Auto-rotate** | Turn the tablet to portrait for a full page, landscape for wider worksheets. |
-| **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. |
+| **Stylus** (optional) | — | Any active or passive stylus works. Once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand can rest on the screen. Lost it? ⋮ → **☝ Fingers draw** (Hok6 offers it too when a finger touches the page). |
 
 #### Samsung Galaxy tablets (e.g. Galaxy Tab S7 FE)
 
@@ -90,11 +90,12 @@ writing characters, quiz yourself, and keep your work backed up.
   every zoom and when the device is turned, so tracing stays on its words), and two fingers scroll, sideways too.
 - **Audio** (mp3, m4a, wav, …) as a folder playlist with a player bar, speed control, repeat-one and lock-screen controls.
 - **Tracing** on PDFs and Word documents with finger or stylus, on as soon as a file opens (two fingers scroll and
-  zoom; once a stylus is used, only the stylus writes). The pen (tap it for the colours), size, eraser, **Clear** and zoom
+  zoom; once a stylus is used, only the stylus writes, until ⋮ → **☝ Fingers draw**). The pen (tap it for the colours),
+  thickness (a drawer like the colours; its button shows the pen's line), eraser, **Clear** and zoom
   are outlined buttons in the title bar, so nothing covers the page (**Clear** erases one page's tracing after asking,
   with Undo in the message that follows); saved per page. ⋮ → **Save a copy with my tracing…** writes a new PDF with the tracing drawn into
   the pages (as sharp lines) into the same folder, e.g. `completed_Homework.pdf`; it warns before replacing a file.
-- **Practice Selector** button on PDFs and Word documents: while it is on, tap a character to open writing practice for it; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
+- **Practice Selector** button on PDFs and Word documents: while it is on, tap a character to choose from the characters on that page (or Word paragraph), which the sheet says plainly, not the whole file; scanned pages are read with on-device text recognition; picking a pen colour goes back to writing.
 - **Writing practice** worksheets:
   - rows of practice squares (米 / 田 grid) with grey characters to trace, written on directly on the tablet;
   - stroke order shown above each row, plus stroke-order animation, step-by-step strokes and a writing quiz for each character;
@@ -104,15 +105,17 @@ writing characters, quiz yourself, and keep your work backed up.
     dictionary, shown right under the practice box;
   - the words practiced last as one-tap chips under the practice box; worksheet options folded under the Create button
     and kept from the last worksheet;
-  - outlined title bar tools, as on homework pages: the pen opens its colours, size, eraser, **Clear** (Undo in the
+  - **✏️ Practice writing** and **📝 Quiz** are separate tabs, so the two aren't mixed up;
+  - what to practice is **⌨ Typed** (characters, or English to look up) or **✍ Drawn** on a pad right in the form;
+  - outlined title bar tools, as on homework pages: the pen opens its colours, the thickness its drawer, eraser, **Clear** (Undo in the
     message), with **☝ Fingers draw / scroll** and zoom under **⋮** so every button keeps Android's full 48dp size;
-  - **Quiz**: on a homework page, tap **Practice Selector**, tap a character, choose characters and tap **Add to quiz**. Writing practice → Quiz
+  - **Quiz**: on a homework page, tap **Practice Selector**, tap a character, choose characters and tap **Add to quiz**. Writing practice → 📝 Quiz tab
     then offers **flash cards** (Chinese → meaning, English → Chinese, or sound → Chinese; you mark Knew it / Again)
     or a **written quiz**: write the character from memory in a blank box, checked stroke by stroke (a hint after 3
     misses, or **Show me**), prompted by its English meaning, its pronunciation, or the character itself, shown at the
     top or hidden after a few seconds. Missed ones come back once at the end of the round; English meanings come from
     the offline dictionary;
-  - **Write by hand (stylus)**: a teacher writes a character on a pad and taps the recognised one to add it to the
+  - **✍ Draw**: write a character on the pad and tap the recognised one to add it to the
     worksheet (Google ML Kit handwriting recognition, on the device; needs internet once to download the Chinese model);
   - history of practiced words and characters (with quiz results) and bookmarks in one list, each one tap away from a fresh
     worksheet;
@@ -250,6 +253,6 @@ This project builds on, bundles data from, or was modelled on the following proj
 | [AndroidX Input Motion Prediction](https://developer.android.com/jetpack/androidx/releases/input) | Drawing the line a little ahead of the pen, so tracing keeps up with its tip | Apache 2.0 |
 | [TomRoush/PdfBox-Android](https://github.com/TomRoush/PdfBox-Android) | Reading the characters on PDF pages, so tapping one in Practice mode opens writing practice | Apache 2.0 |
 | [Google ML Kit Text Recognition v2 (Chinese)](https://developers.google.com/ml-kit/vision/text-recognition/v2) | Recognising characters on scanned PDF pages that have no text layer (on-device, bundled model) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
-| [Google ML Kit Digital Ink Recognition](https://developers.google.com/ml-kit/vision/digital-ink-recognition) | **Write by hand** in writing practice: recognising handwritten characters (on-device; the Chinese model downloads once) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
+| [Google ML Kit Digital Ink Recognition](https://developers.google.com/ml-kit/vision/digital-ink-recognition) | **✍ Draw** in writing practice: recognising handwritten characters (on-device; the Chinese model downloads once) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
 
 Colloquial Cantonese characters that are not in the stroke data (e.g. 咗, 佢, 哋, 喺) are assembled from their components by this app; those are marked ≈ and their stroke order is an approximation.

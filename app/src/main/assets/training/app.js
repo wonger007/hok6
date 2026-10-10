@@ -9,6 +9,8 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const PAGE_W = 215.9, PAGE_H = 279.4;
 const MODEL = '#111111', GREY = '#C8C8C8', GRID = '#CFCFCF', BRAND = '#C62828';
 const PEN_SIZES = [0.45, 0.8, 1.3];
+/* How thick each pen size is drawn on its button and in the thickness drawer, in px. */
+const SIZE_LINES = [3, 6, 10];
 /* Set on each stroke rather than in CSS, so strokes also look right in the phone squares (<use> copies). */
 const INK_STYLE = { fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
 const Native = window.Android || null;
@@ -490,6 +492,7 @@ function setFingerDraw(on, announce) {
   $('fingerBtn').classList.toggle('sel', on);
   // Says what a finger does now: write, or scroll (once a stylus is used, only the stylus writes).
   $('fingerBtn').textContent = on ? '☝ Fingers draw' : '☝ Fingers scroll';
+  $('hFinger').hidden = on;
   if (announce) toast(on ? 'Fingers draw — scroll with two fingers' : 'Stylus detected — fingers now scroll, the pen writes');
 }
 
@@ -523,7 +526,14 @@ function setupInk(pages) {
     if (e.pointerType === 'pen') pens.add(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (!state.fingerDraw) return;
+      if (!state.fingerDraw) {
+        // Only the stylus writes now; once, say how to write with a finger again (e.g. the stylus is lost).
+        if (!state.fingerHinted && touches.size === 1 && e.target.closest && e.target.closest('svg[data-page]')) {
+          state.fingerHinted = true;
+          toast('Only the stylus writes; fingers scroll.', { label: '☝ Let fingers draw', run: () => setFingerDraw(true, true) });
+        }
+        return;
+      }
       if (touches.size >= 2) {
         cancelActive();
         pan = avg();
@@ -1364,13 +1374,28 @@ function renderQuizCard() {
     out.appendChild(chip);
   }
   // Until something is added, a one-line tip says how, instead of the whole card.
+  $('quizCount').textContent = items.length || '';
   $('quizCard').hidden = items.length === 0;
   $('quizTip').hidden = items.length > 0;
   $('quizStart').hidden = items.length === 0;
   $('quizClear').hidden = items.length === 0;
 }
 
+/* Writing practice and the quiz are two tabs of the home screen, so the two aren't mixed up. */
+function setTab(tab) {
+  store.set('homeTab', tab);
+  $('homeMain').dataset.tab = tab;
+  $('tabPractice').classList.toggle('sel', tab === 'practice');
+  $('tabQuiz').classList.toggle('sel', tab === 'quiz');
+  $('tabPractice').setAttribute('aria-selected', tab === 'practice');
+  $('tabQuiz').setAttribute('aria-selected', tab === 'quiz');
+  $('homeMain').scrollTop = 0;
+}
+
 function setupQuiz() {
+  $('tabPractice').onclick = () => setTab('practice');
+  $('tabQuiz').onclick = () => setTab('quiz');
+  setTab(store.get('homeTab', 'practice'));
   const opts = store.get('quizOpts', {});
   const pick = (name, value) => document.querySelectorAll(`input[name=${name}]`).forEach((r) => { r.checked = r.value === value; });
   if (opts.fcDir) pick('fcDir', opts.fcDir);
@@ -1710,20 +1735,23 @@ async function meaningOf(word) {
 
 /* A teacher writes characters with a stylus (or finger); the app recognises them (ML Kit, on the device) and the
    chosen one is added to the New worksheet box. Strokes are [x, y, t, x, y, t, …] in CSS px and ms. */
-const hand = { strokes: [], current: null, penSeen: false, timer: 0, request: 0, t0: 0 };
+const hand = { strokes: [], current: null, timer: 0, request: 0, t0: 0 };
 
 function setupHandPad() {
   if (!Native || !Native.recognizeInk) return; // recognition is done by the app
-  $('handBtn').hidden = false;
-  $('handBtn').onclick = openHandPad;
+  $('inputMode').hidden = false;
+  document.querySelectorAll('input[name=inputMode]').forEach((r) => {
+    r.addEventListener('change', () => { if (r.checked) setInputMode(r.value); });
+  });
   const canvas = $('hCanvas');
   const point = (e) => {
     const r = canvas.getBoundingClientRect();
     hand.current.push(Math.round(e.clientX - r.left), Math.round(e.clientY - r.top), Math.round(e.timeStamp - hand.t0));
   };
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'pen') hand.penSeen = true;
-    else if (hand.penSeen && e.pointerType === 'touch') return; // a hand resting on the screen while writing with a stylus
+    if (e.pointerType === 'pen' && state.fingerDraw) setFingerDraw(false, false);
+    // A hand resting on the screen while writing with a stylus; "Let fingers write" (hFinger) turns this off.
+    if (e.pointerType === 'touch' && !state.fingerDraw) return;
     canvas.setPointerCapture(e.pointerId);
     clearTimeout(hand.timer);
     if (!hand.strokes.length) hand.t0 = e.timeStamp;
@@ -1752,22 +1780,28 @@ function setupHandPad() {
     f.value = Array.from(f.value.replace(/\s+$/, '')).slice(0, -1).join('');
     handBoxChanged();
   };
-  $('hDone').onclick = closeHandPad;
-  $('hClose').onclick = closeHandPad;
+  $('hFinger').onclick = () => setFingerDraw(true, true);
+  $('hFinger').hidden = state.fingerDraw;
+  if (store.get('inputMode', 'type') === 'draw') {
+    document.querySelector('input[name=inputMode][value=draw]').checked = true;
+    setInputMode('draw');
+  }
 }
 
-function openHandPad() {
-  $('handPad').hidden = false;
+/* What to practice is typed (characters, or English to look up) or drawn on the pad and recognised. */
+function setInputMode(mode) {
+  store.set('inputMode', mode);
+  const draw = mode === 'draw';
+  $('typeArea').hidden = draw;
+  $('drawArea').hidden = !draw;
+  if (!draw) { clearTimeout(hand.timer); return; }
   clearHand();
   handBoxChanged();
   // Starts the one-time model download now, rather than after the first character is written.
-  const r = $('hCanvas').getBoundingClientRect();
-  Native.recognizeInk(++hand.request, state.lang, '[]', r.width, r.height);
-}
-
-function closeHandPad() {
-  clearTimeout(hand.timer);
-  $('handPad').hidden = true;
+  requestAnimationFrame(() => {
+    const r = $('hCanvas').getBoundingClientRect();
+    if (r.width) Native.recognizeInk(++hand.request, state.lang, '[]', r.width, r.height);
+  });
 }
 
 function clearHand() {
@@ -1810,7 +1844,7 @@ function recognizeHand() {
 }
 
 window.inkResult = function inkResult(id, result) {
-  if (id !== hand.request || $('handPad').hidden) return;
+  if (id !== hand.request || $('drawArea').hidden) return;
   const status = $('hStatus');
   if (result.downloading) {
     status.textContent = 'Getting handwriting recognition ready (a one-time download)…';
@@ -1881,13 +1915,17 @@ function updateTools() {
   document.querySelectorAll('#colorTray button.pen').forEach((b) => {
     b.classList.toggle('sel', b.dataset.color === state.color);
   });
-  // The pen button shows the pen's colour, and its size by the dot's size.
+  // The pen button shows the pen's colour; the thickness button, a line as thick as the pen.
   const pen = $('penBtn');
   pen.classList.toggle('sel', state.tool === 'pen');
   const dot = pen.querySelector('i');
-  const px = 10 + state.size * 5;
-  dot.style.width = dot.style.height = px + 'px';
+  dot.style.width = dot.style.height = '18px';
   dot.style.background = state.color;
+  $('sizeBtn').querySelector('i').style.height = SIZE_LINES[state.size] + 'px';
+  document.querySelectorAll('#sizeTray button.size').forEach((b) => {
+    b.classList.toggle('sel', Number(b.dataset.size) === state.size);
+    b.querySelector('i').style.height = SIZE_LINES[Number(b.dataset.size)] + 'px';
+  });
   $('eraserBtn').classList.toggle('sel', state.tool === 'eraser');
 }
 
@@ -1901,11 +1939,13 @@ function toggleMoreMenu() {
   menu.hidden = false;
 }
 
-/* The pen colours open under the pen button; choosing one (or tapping anywhere else) closes them. */
-function toggleColorTray() {
-  const tray = $('colorTray');
+/* The pen colours and thicknesses open under their buttons; choosing one (or tapping anywhere else) closes them. */
+function toggleTray(trayId, buttonId) {
+  const tray = $(trayId);
+  const other = trayId === 'colorTray' ? 'sizeTray' : 'colorTray';
+  $(other).hidden = true;
   if (!tray.hidden) { tray.hidden = true; return; }
-  const r = $('penBtn').getBoundingClientRect();
+  const r = $(buttonId).getBoundingClientRect();
   tray.style.top = (r.bottom + 6) + 'px';
   tray.style.left = Math.max(8, Math.min(r.left, innerWidth - 200)) + 'px';
   tray.hidden = false;
@@ -1915,12 +1955,17 @@ function setupSheet() {
   $('sheetBack').onclick = () => {
     if (state.autoStarted && Native && Native.close) { saveInk(); Native.close(); } else closeSheet();
   };
-  $('penBtn').onclick = (e) => { e.stopPropagation(); toggleColorTray(); };
+  $('penBtn').onclick = (e) => { e.stopPropagation(); toggleTray('colorTray', 'penBtn'); };
+  $('sizeBtn').onclick = (e) => { e.stopPropagation(); toggleTray('sizeTray', 'sizeBtn'); };
+  document.querySelectorAll('#sizeTray button.size').forEach((b) => {
+    b.onclick = () => { state.size = Number(b.dataset.size); state.tool = 'pen'; $('sizeTray').hidden = true; updateTools(); };
+  });
   document.querySelectorAll('#colorTray button.pen').forEach((b) => {
     b.onclick = () => { state.color = b.dataset.color; state.tool = 'pen'; $('colorTray').hidden = true; updateTools(); };
   });
   document.addEventListener('pointerdown', (e) => {
     if (!$('colorTray').hidden && !e.target.closest('#colorTray, #penBtn')) $('colorTray').hidden = true;
+    if (!$('sizeTray').hidden && !e.target.closest('#sizeTray, #sizeBtn')) $('sizeTray').hidden = true;
     if (!$('moreMenu').hidden && !e.target.closest('#moreMenu, #moreBtn')) $('moreMenu').hidden = true;
   }, true);
   $('moreBtn').onclick = (e) => { e.stopPropagation(); toggleMoreMenu(); };
@@ -1928,7 +1973,6 @@ function setupSheet() {
     const item = e.target.closest('button');
     if (item && !item.classList.contains('keep-open')) $('moreMenu').hidden = true;
   });
-  $('sizeBtn').onclick = () => { state.size = (state.size + 1) % PEN_SIZES.length; state.tool = 'pen'; updateTools(); };
   $('eraserBtn').onclick = () => { state.tool = state.tool === 'eraser' ? 'pen' : 'eraser'; updateTools(); };
   $('clearBtn').onclick = clearScreen;
   $('fingerBtn').onclick = () => setFingerDraw(!state.fingerDraw, true);
@@ -1943,8 +1987,8 @@ function setupSheet() {
 window.handleBack = function handleBack() {
   if (!$('moreMenu').hidden) { $('moreMenu').hidden = true; return true; }
   if (!$('colorTray').hidden) { $('colorTray').hidden = true; return true; }
+  if (!$('sizeTray').hidden) { $('sizeTray').hidden = true; return true; }
   if (!$('practice').hidden) { closePractice(); return true; }
-  if (!$('handPad').hidden) { closeHandPad(); return true; }
   if (!$('quizView').hidden) { closeQuiz(); return true; }
   if (!$('printDialog').hidden) { $('printDialog').hidden = true; return true; }
   if (!$('sheet').hidden) {

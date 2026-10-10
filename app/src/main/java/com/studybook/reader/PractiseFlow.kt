@@ -61,7 +61,8 @@ class PractiseFlow(
                 return@launch
             }
             val preselected = pressed?.text?.let { chineseIn(it) }.orEmpty().toSet()
-            PracticePicker.show(activity, PdfText.chineseCharacters(glyphs), preselected, recognised) { practise(it) }
+            val scope = activity.getString(R.string.practise_from_page, page + 1, pdf.pageCount)
+            PracticePicker.show(activity, PdfText.chineseCharacters(glyphs), preselected, scope, recognised) { practise(it) }
         }
     }
 
@@ -91,11 +92,13 @@ class PractiseFlow(
         }
         val start = text.lastIndexOf('\n', offset - 1).let { if (it < 0) 0 else it + 1 }
         val end = text.indexOf('\n', offset).let { if (it < 0) text.length else it }
-        PracticePicker.show(activity, chineseIn(text.subSequence(start, end)), setOf(tapped)) { practise(it) }
+        PracticePicker.show(activity, chineseIn(text.subSequence(start, end)), setOf(tapped),
+            activity.getString(R.string.practise_from_paragraph)) { practise(it) }
     }
 
     /** Offers all the characters of the Word document. */
-    fun pickAllFromDocx() = PracticePicker.show(activity, chineseIn(docxText.text), emptySet()) { practise(it) }
+    fun pickAllFromDocx() = PracticePicker.show(activity, chineseIn(docxText.text), emptySet(),
+        activity.getString(R.string.practise_from_document)) { practise(it) }
 
     private fun chineseIn(text: CharSequence): List<String> =
         text.codePoints().toArray().map { String(Character.toChars(it)) }.filter(::isChinese).distinct()

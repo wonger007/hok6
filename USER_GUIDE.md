@@ -54,7 +54,9 @@ and pick the SD card.
 ## 2. Open your book
 
 1. Open **Hok6** and tap **Choose book folder**. Pick your book folder, tap **Use this folder**, then **Allow**.
-   Hok6 remembers it; **Change book folder** (folder icon) picks another one.
+   Hok6 remembers it; **Change book folder** (folder icon) picks another one. Before Android's folder screen opens,
+   Hok6 shows your current folder with **Cancel**; on Android's screen, press **Back** until you're back in Hok6 to
+   leave without choosing (each press first goes up a folder).
 2. Tap a folder card. A folder with more folders in it (e.g. a book with chapters) opens as cards again, with the
    folders above it shown under the title; **Back** goes up a level. A folder of files opens its file list; tap a file
    to open it full screen, and **Back** returns to the list. A folder with both shows its files as a
@@ -68,8 +70,10 @@ and pick the SD card.
 
 - **Write** straight on a PDF or Word page with a finger or stylus. Scroll and zoom with two fingers (once you use a
   stylus, fingers only scroll, so your hand can rest on the screen).
-- Use the title bar to change the pen colour (tap the pen to open the colours) and size, erase, or zoom (− / +, or
-  pinch).
+- **Lost the stylus?** ⋮ → **☝ Fingers draw** lets a finger write again. The first time a finger touches the page
+  while only the stylus writes, Hok6 also offers **Let fingers draw**.
+- Use the title bar to change the pen colour (tap the pen to open the colours) and thickness (tap the line next to it:
+  the line shows how thick the pen is), erase, or zoom (− / +, or pinch).
 - **Clear** erases the tracing on one page. It asks first, and asks which page when two pages with tracing are on
   screen. The message that appears afterwards offers **Undo**.
 - Tap the page number at the bottom (e.g. **2 / 5**) to go to another page. Hok6 remembers the page you were on.
@@ -83,18 +87,20 @@ and pinyin/jyutping above characters. Zooming doesn't re-wrap the lines, so trac
 
 ## 4. Practice writing characters
 
-- On a page, tap **Practice Selector**, then tap a character: pick the characters you want and tap **Practice (n)** to get a
+- On a page, tap **Practice Selector**, then tap a character: Hok6 shows the characters on **that page** (in a Word
+  document, that paragraph), not the whole file. Pick the ones you want and tap **Practice (n)** to get a
   worksheet with stroke order, a row to trace and rows to write in. Tap a pen to go back to writing on the page.
   Scanned pages (pictures with no text) are read on the device; check the characters it found are right.
-- Or tap **Writing practice** on the main screen and type characters, words or English (e.g. *thank you*), or tap
-  **✍ Write by hand** to write a character with a stylus. English shows Chinese words right under the box; tap one to
-  use it. Then tap **Create worksheet**. Box size, guide lines and the rest are under **Worksheet options** (kept from
+- Or tap **Writing practice** on the main screen. Its **✏️ Practice writing** tab makes worksheets (the quiz has its
+  own tab). Choose **⌨ Type** to type characters, words or English (e.g. *thank you*; English shows Chinese words right
+  under the box, tap one to use it), or **✍ Draw** to write a character on the pad and tap the right one; it's added
+  to **To practice**. Then tap **Create worksheet**. Box size, guide lines and the rest are under **Worksheet options** (kept from
   your last worksheet), and the words you practiced last are chips under the box: tap one to practice it again.
 - On a worksheet, tap a stroke-order square to watch the strokes and try **✍ Write it**; tap 🔊 to hear the word,
   and the speed button next to it for 1×, 0.75× or 0.5×. Tone names are shown with the reading (e.g. nei5 · tone 5,
   low rising).
-- The worksheet's title bar works like a homework page's: tap the pen for the colours, and **Clear** (with Undo in the
-  message). **Export** prints it or shares it as a PDF (US Letter), blank or with your writing. **⋮** holds
+- The worksheet's title bar works like a homework page's: tap the pen for the colours, the line for the thickness,
+  and **Clear** (with Undo in the message). **Export** prints it or shares it as a PDF (US Letter), blank or with your writing. **⋮** holds
   **☝ Fingers draw / scroll** (whether a finger writes) and **Zoom in / out** (the menu stays open while you zoom; tap
   outside it to close).
 - Your writing on a worksheet is kept for each word, so it's still there when you practice that word again.
@@ -107,7 +113,7 @@ On a phone, worksheets show one character at a time with big squares.
 ## 5. Quiz yourself
 
 1. On a page, tap **Practice Selector**, tap a character, choose the ones to learn and tap **Add to quiz**.
-2. Open **Writing practice** and find the **Quiz** card (it appears once something is in the quiz):
+2. Open **Writing practice** and tap the **📝 Quiz** tab (it shows how many are in the quiz):
    - **Flash cards**: choose Chinese → meaning, English → Chinese or Sound → Chinese, tap **Start flash cards**, then
      **Show answer** and mark **Knew it** or **Again**.
    - **Written quiz**: choose the prompt (English meaning, the Chinese character, which can hide after a few seconds,
@@ -145,7 +151,8 @@ Main screen ⋮ → **Settings**:
 
 ## Tips
 
-- **Hand on the screen:** use a stylus once and only the stylus writes; fingers scroll and zoom.
+- **Hand on the screen:** use a stylus once and only the stylus writes; fingers scroll and zoom. Lost the stylus?
+  ⋮ → **☝ Fingers draw**.
 - **Portrait or landscape:** turn the tablet to portrait for a full page, landscape for wider worksheets. Tracing
   stays in place either way.
 - **No sound from 🔊:** without internet, a voice only works once it's downloaded. Connect to Wi-Fi, or ⋮ →

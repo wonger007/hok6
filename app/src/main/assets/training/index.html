@@ -23,9 +23,18 @@
     </div>
   </header>
 
-  <main class="home-main">
-    <form id="newForm" class="card">
+  <main class="home-main" id="homeMain" data-tab="practice">
+    <div class="home-tabs" role="tablist">
+      <button type="button" role="tab" id="tabPractice" class="sel">✏️ Practice writing</button>
+      <button type="button" role="tab" id="tabQuiz">📝 Quiz <span id="quizCount" class="tab-count"></span></button>
+    </div>
+    <form id="newForm" class="card tab-practice">
       <h2>New worksheet</h2>
+      <div id="inputMode" class="input-mode" role="radiogroup" aria-label="How to enter what to practice" hidden>
+        <label><input type="radio" name="inputMode" value="type" checked><span>⌨ Type</span></label>
+        <label><input type="radio" name="inputMode" value="draw"><span>✍ Draw</span></label>
+      </div>
+      <div id="typeArea">
       <label class="field">Characters, words or English to practice
         <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 — or type English: thank you, good morning"></textarea>
         <small>One page per word (separate words with spaces): stroke order, a row to trace, then rows to write it.</small>
@@ -34,12 +43,35 @@
         <span class="muted">Recent — tap to practice again:</span>
         <div id="recentChips" class="recent-chips"></div>
       </div>
-      <button type="button" id="handBtn" hidden>✍ Write by hand (stylus)</button>
       <!-- English typed in the box above is looked up here, right under it, so it's clear the words are to tap. -->
       <div id="translateBox" class="tr-box">
         <h3>English → <span id="trLang">廣東話 Cantonese</span> <span class="tr-tap">— tap a word to use it</span></h3>
         <p id="trHint" class="muted">Type English above (e.g. <i>thank you, good morning</i>) and Chinese words appear here. Tap one to use it.</p>
         <div id="trResults"></div>
+      </div>
+      </div>
+      <!-- Drawing: write a character, tap the right one, and it joins what to practice. -->
+      <div id="drawArea" class="draw-area" hidden>
+        <div class="hand-wrap">
+          <svg class="writer-grid" viewBox="0 0 100 100" aria-hidden="true">
+            <g stroke="#D8D8D8" stroke-width="0.5" stroke-dasharray="2 2">
+              <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/>
+              <line x1="50" y1="0" x2="50" y2="100"/><line x1="0" y1="50" x2="100" y2="50"/>
+            </g>
+          </svg>
+          <canvas id="hCanvas"></canvas>
+        </div>
+        <div class="hand-side">
+          <p id="hStatus" class="status">Write a character in the square, then tap the right one below.</p>
+          <div id="hCands" class="hand-cands"></div>
+          <div class="hand-buttons">
+            <button type="button" id="hClear">Clear</button>
+            <button type="button" id="hSpace">Space (next word)</button>
+            <button type="button" id="hDel" aria-label="Delete the last character">⌫</button>
+          </div>
+          <p class="hand-box"><span class="muted">To practice:</span> <span id="hText"></span></p>
+          <button type="button" id="hFinger" class="plain small" hidden>☝ Lost the stylus? Let fingers write</button>
+        </div>
       </div>
 
       <button type="submit" class="primary">Create worksheet</button>
@@ -65,8 +97,8 @@
       </details>
     </form>
 
-    <p id="quizTip" class="muted quiz-tip" hidden>📝 <b>Quiz</b>: on a homework page, tap <b>Practice Selector</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>. The quiz appears here.</p>
-    <section class="card" id="quizCard" hidden>
+    <p id="quizTip" class="muted quiz-tip tab-quiz" hidden>📝 <b>Quiz</b>: on a homework page, tap <b>Practice Selector</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>. The quiz appears here.</p>
+    <section class="card tab-quiz" id="quizCard" hidden>
       <div class="card-head">
         <h2>Quiz</h2>
         <button id="quizClear" class="plain small" hidden>Remove all</button>
@@ -98,7 +130,7 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card tab-practice">
       <div class="card-head">
         <h2>History &amp; bookmarks</h2>
         <button id="bmPractise" class="primary small" hidden>Practice all ★</button>
@@ -120,7 +152,7 @@
     </section>
 
 
-    <section class="card credits">
+    <section class="card credits tab-practice">
       <h2>About Hok6</h2>
       <p><b>Hok6</b> (學, hok6) — where you learn, study, and imitate.</p>
       <h3>Device settings</h3>
@@ -145,7 +177,7 @@
           Preferred engine → that one → ⚙ → Install voice data. A book on a microSD card: in the folder picker, tap ☰
           and pick the SD card.</li>
         <li><b>Stylus</b> (optional): once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand
-          can rest on the screen.</li>
+          can rest on the screen. Lost the stylus? ⋮ → <b>☝ Fingers draw</b>.</li>
       </ul>
       <h3>Credits</h3>
       <p>Stroke order animations and quizzes by <b>Hanzi Writer</b> (github.com/chanind/hanzi-writer, MIT).
@@ -172,7 +204,7 @@
     <div class="spacer"></div>
     <div class="group">
       <button class="tbtn pen-btn" id="penBtn" aria-label="Pen colour"><i></i></button>
-      <button class="tbtn" id="sizeBtn" aria-label="Pen size">◍</button>
+      <button class="tbtn size-btn" id="sizeBtn" aria-label="Pen thickness"><i></i></button>
       <button class="tbtn" id="eraserBtn" aria-label="Eraser">⌫</button>
       <button class="tbtn clear-btn" id="clearBtn" aria-label="Clear: erase all writing on screen">🗑 Clear</button>
     </div>
@@ -267,37 +299,6 @@
   </div>
 </div>
 
-<!-- Handwriting pad: write characters with a stylus; the chosen one goes into the New worksheet box -->
-<div id="handPad" class="modal" hidden>
-  <div class="modal-card hand-card">
-    <div class="hand-head">
-      <h2>Write by hand</h2>
-      <div class="spacer"></div>
-      <button class="icon" id="hClose" aria-label="Close">✕</button>
-    </div>
-    <div class="hand-wrap">
-      <svg class="writer-grid" viewBox="0 0 100 100" aria-hidden="true">
-        <g stroke="#D8D8D8" stroke-width="0.5" stroke-dasharray="2 2">
-          <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/>
-          <line x1="50" y1="0" x2="50" y2="100"/><line x1="0" y1="50" x2="100" y2="50"/>
-        </g>
-      </svg>
-      <canvas id="hCanvas"></canvas>
-    </div>
-    <div class="hand-side">
-      <p id="hStatus" class="status">Write a character in the square, then tap the right one below.</p>
-      <div id="hCands" class="hand-cands"></div>
-      <div class="hand-buttons">
-        <button id="hClear">Clear</button>
-        <button id="hSpace">Space (next word)</button>
-        <button id="hDel" aria-label="Delete the last character">⌫</button>
-        <button id="hDone" class="primary">Done</button>
-      </div>
-      <p class="hand-box"><span class="muted">In the box:</span> <span id="hText"></span></p>
-    </div>
-  </div>
-</div>
-
 <!-- Export: print, or share a PDF with another app -->
 <div id="printDialog" class="modal" hidden>
   <div class="modal-card small-card">
@@ -316,6 +317,12 @@
   <button class="pen" data-color="#212121" aria-label="Black pen"><i style="background:#212121"></i></button>
   <button class="pen" data-color="#1E88E5" aria-label="Blue pen"><i style="background:#1E88E5"></i></button>
   <button class="pen" data-color="#E53935" aria-label="Red pen"><i style="background:#E53935"></i></button>
+</div>
+<!-- The pen thicknesses, opening under the thickness button. -->
+<div id="sizeTray" class="color-tray" hidden>
+  <button class="size" data-size="0" aria-label="Thin pen"><i></i></button>
+  <button class="size" data-size="1" aria-label="Medium pen"><i></i></button>
+  <button class="size" data-size="2" aria-label="Thick pen"><i></i></button>
 </div>
 <!-- Less-used worksheet tools, under ⋮ so the title bar has room for the rest at full size. -->
 <div id="moreMenu" class="bar-menu" role="menu" hidden>

@@ -13,6 +13,8 @@ windows_path() {
 }
 
 args=(); command=""; skip=0
+# ANDROID_SERIAL is set in Linux and doesn't reach adb.exe: pass it on as -s (unless a device is named already).
+if [ -n "$ANDROID_SERIAL" ] && [[ " $* " != *" -s "* ]]; then args+=(-s "$ANDROID_SERIAL"); fi
 for a in "$@"; do
     if [ "$skip" = 1 ]; then args+=("$a"); skip=0; continue; fi
     if [ -z "$command" ]; then

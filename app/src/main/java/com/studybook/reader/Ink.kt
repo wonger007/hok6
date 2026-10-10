@@ -203,8 +203,10 @@ class Ink(context: Context) {
     var tool = InkTool.PEN
     var color = PEN_COLORS[0]
     var widthDp = PEN_SIZES[1]
-    /** Once a stylus is used, fingers go back to scrolling and only the stylus draws. */
+    /** Once a stylus is used, fingers go back to scrolling and only the stylus draws (until fingers are let draw). */
     var stylusSeen = false
+    /** A finger touched the page while only the stylus draws, e.g. to say how to draw with fingers again. */
+    var onFingerIgnored: (() -> Unit)? = null
     var document: InkDocument? = null
 
     companion object {
@@ -245,7 +247,10 @@ class InkSurface(private val view: View, private val ink: Ink) {
         if (!ink.active || doc == null || view.width == 0) return false
         val toolType = ev.getToolType(0)
         if (toolType == MotionEvent.TOOL_TYPE_STYLUS || toolType == MotionEvent.TOOL_TYPE_ERASER) ink.stylusSeen = true
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN && ink.stylusSeen && toolType == MotionEvent.TOOL_TYPE_FINGER) return false
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && ink.stylusSeen && toolType == MotionEvent.TOOL_TYPE_FINGER) {
+            ink.onFingerIgnored?.invoke()
+            return false
+        }
 
         val w = view.width.toFloat()
         predictor.record(ev)

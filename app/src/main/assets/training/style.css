@@ -380,3 +380,35 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
 /* Speed buttons show the speaking speed (1×, 0.75×, 0.5×) and step through it. */
 button.icon.speed { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 56px; }
 .q-sound.speed { font-size: 24px; font-weight: 600; }
+
+/* Writing practice and the quiz, as two tabs, so it's clear which is which. */
+.home-tabs { grid-column: 1 / -1; display: flex; gap: 8px; }
+.home-tabs button {
+  flex: 1; min-height: 52px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card);
+  font-size: 17px; font-weight: 600; color: inherit;
+}
+.home-tabs button.sel { background: var(--brand); border-color: var(--brand); color: #fff; }
+.tab-count:empty { display: none; }
+.tab-count { display: inline-block; min-width: 24px; padding: 0 6px; border-radius: 999px; background: rgba(0,0,0,0.12); font-size: 14px; }
+.home-tabs button.sel .tab-count { background: rgba(255,255,255,0.3); }
+.home-main[data-tab="practice"] .tab-quiz, .home-main[data-tab="quiz"] .tab-practice { display: none !important; }
+
+/* Type or draw what to practice. */
+.input-mode { display: inline-flex; margin: 0 0 14px; border: 1.5px solid var(--brand); border-radius: 999px; padding: 3px; }
+.input-mode[hidden] { display: none; }
+.input-mode label { cursor: pointer; }
+.input-mode input { display: none; }
+.input-mode span { display: inline-block; min-height: 40px; line-height: 40px; padding: 0 18px; border-radius: 999px; font-size: 16px; }
+.input-mode input:checked + span { background: var(--brand); color: #fff; font-weight: 600; }
+.draw-area { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0 0 16px; }
+.draw-area[hidden] { display: none; }
+
+/* The pen thickness: the button and its drawer show lines as thick as the pen. */
+.bar button.size-btn i, .color-tray button.size i {
+  display: inline-block; width: 26px; border-radius: 99px; background: #fff; vertical-align: middle;
+}
+.color-tray button.size {
+  width: 52px; height: 52px; min-height: 0; padding: 0; border-radius: 8px; border: 1.5px solid rgba(255,255,255,0.7);
+  background: transparent; display: flex; align-items: center; justify-content: center;
+}
+.color-tray button.size.sel { background: rgba(255,255,255,0.3); border: 2.5px solid #fff; }
