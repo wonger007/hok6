@@ -9,8 +9,10 @@ The steps are explained below.
 
 ---
 
-**Hok6** (學, *hok6*) is an Android app for studying your own Cantonese or Mandarin textbook: write on your homework,
-practise characters with stroke order, and quiz yourself. It's in testing on Google Play, and you can help by trying it.
+**Hok6** (學, *hok6*) is an Android app that turns your own textbook and worksheets (PDF or Word) into pages you can
+write and trace on with a finger or stylus, in any language, and plays the lesson audio. For Chinese (Cantonese or
+Mandarin) it adds stroke-order practice, worksheets and quizzes. It's in testing on Google Play, and you can help by
+trying it.
 
 You need an Android phone or tablet (Android 8.0 or newer) and a Google account.
 
