@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- First start: Hok6's name and tag line, as on the splash, then what it needs from the internet and a button to
-     get it all, or skip. -->
+<!-- First start: Hok6's name and tag line, as on the splash, then the language to learn, what it needs from the
+     internet and a button to get it all, or skip. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -66,6 +66,23 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="@string/settings_language"
+                android:textSize="@dimen/text_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/language_note"
+                android:textSize="@dimen/text_body" />
+
+            <include layout="@layout/language_choice" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:text="@string/setup_title"
                 android:textSize="@dimen/text_title"
                 android:textStyle="bold" />

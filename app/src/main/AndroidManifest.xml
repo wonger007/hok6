@@ -38,6 +38,11 @@
             android:parentActivityName=".MainActivity" />
 
         <activity
+            android:name=".AboutActivity"
+            android:label="@string/about"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".ChapterActivity"
             android:theme="@style/Theme.StudyBook.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"

@@ -46,15 +46,15 @@ object PdfText {
         return out
     }
 
-    /** The Chinese characters of a page in reading order, without repeats. */
-    fun chineseCharacters(glyphs: List<PdfGlyph>): List<String> =
+    /** The characters to practise on a page (see [isPracticeChar]) in reading order, without repeats. */
+    fun practiceCharacters(glyphs: List<PdfGlyph>): List<String> =
         glyphs.flatMap { g -> g.text.codePoints().toArray().map { String(Character.toChars(it)) } }
-            .filter(::isChinese)
+            .filter(::isPracticeChar)
             .distinct()
 
     /** The character whose box contains (or is nearest to) the point, if one is close enough. */
     fun glyphAt(glyphs: List<PdfGlyph>, x: Float, y: Float, slop: Float): PdfGlyph? =
-        glyphs.filter { g -> g.text.codePoints().anyMatch { isChinese(String(Character.toChars(it))) } }
+        glyphs.filter { g -> g.text.codePoints().anyMatch { isPracticeChar(String(Character.toChars(it))) } }
             .minByOrNull { g ->
                 val dx = max(0f, max(g.left - x, x - g.right))
                 val dy = max(0f, max(g.top - y, y - g.bottom))
@@ -63,7 +63,9 @@ object PdfText {
             ?.takeIf { g -> x >= g.left - slop && x <= g.right + slop && y >= g.top - slop && y <= g.bottom + slop }
 }
 
-fun isChinese(ch: String): Boolean {
-    val cp = ch.codePointAt(0)
-    return Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN
+/** Whether a character can be practised: Han characters (Chinese, kanji, hanja), kana and hangul. */
+fun isPracticeChar(ch: String): Boolean = when (Character.UnicodeScript.of(ch.codePointAt(0))) {
+    Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA, Character.UnicodeScript.KATAKANA,
+    Character.UnicodeScript.HANGUL -> true
+    else -> false
 }

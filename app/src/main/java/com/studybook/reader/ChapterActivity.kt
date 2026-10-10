@@ -73,6 +73,7 @@ class ChapterActivity : AppCompatActivity() {
     /** The tracing and zoom tools in the title bar, shown while a file is open. */
     private lateinit var fileTools: View
     private lateinit var practiseButton: TextView
+    private lateinit var modeButton: TextView
     private lateinit var penButton: ImageButton
     private lateinit var sizeButton: ImageButton
     private lateinit var eraserButton: ImageButton
@@ -113,6 +114,7 @@ class ChapterActivity : AppCompatActivity() {
         docxText = findViewById(R.id.docx_text)
         fileTools = findViewById(R.id.file_tools)
         practiseButton = findViewById(R.id.practise_mode)
+        modeButton = findViewById(R.id.ink_mode)
         eraserButton = findViewById(R.id.ink_eraser)
         penButton = findViewById(R.id.ink_pen)
         sizeButton = findViewById(R.id.ink_size)
@@ -193,10 +195,6 @@ class ChapterActivity : AppCompatActivity() {
         menu.findItem(R.id.writing_practice).isVisible = current == null
         menu.findItem(R.id.move_files).isVisible = files.isNotEmpty()
         menu.findItem(R.id.save_traced).isVisible = current?.kind == Kind.PDF
-        menu.findItem(R.id.fingers_draw).apply {
-            isVisible = current?.kind == Kind.PDF || current?.kind == Kind.DOCX
-            isChecked = !ink.stylusSeen
-        }
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -206,7 +204,6 @@ class ChapterActivity : AppCompatActivity() {
             R.id.open_external -> current?.let { openExternal(it) }
             R.id.move_files -> startSelection(null)
             R.id.save_traced -> saveTraced()
-            R.id.fingers_draw -> setFingersDraw(ink.stylusSeen) // switches: on when only the stylus draws now
             R.id.writing_practice -> when {
                 current?.kind == Kind.PDF && pdfFrame.isVisible -> practice.pickFromPdf(pdf.middlePage, null, null)
                 current?.kind == Kind.DOCX && docxFrame.isVisible -> practice.pickAllFromDocx()
@@ -531,16 +528,36 @@ class ChapterActivity : AppCompatActivity() {
         invalidateOptionsMenu()
     }
 
-    /** Fingers draw (as before a stylus is used), or only the stylus does and fingers scroll. */
+    /** Fingers draw too, or only the stylus does and fingers scroll; remembered (see [Stylus]). */
     private fun setFingersDraw(on: Boolean) {
-        ink.stylusSeen = !on
+        ink.fingersDraw = on
+        Stylus.setFingersDraw(this, on)
+        updateModeButton()
         Toast.makeText(this, if (on) R.string.fingers_draw_on else R.string.fingers_draw_off, Toast.LENGTH_SHORT).show()
+    }
+
+    /** The stylus / finger toggle: shown when the device takes a stylus, saying who writes now. */
+    private fun updateModeButton() {
+        modeButton.isVisible = Stylus.supported(this)
+        modeButton.setText(if (ink.fingersDraw) R.string.mode_finger else R.string.mode_stylus)
+        modeButton.contentDescription = getString(if (ink.fingersDraw) R.string.mode_finger_desc else R.string.mode_stylus_desc)
     }
 
     private fun setupInkTools() {
         // Once a stylus has been used, a finger only scrolls: the first time one touches the page, say how to draw with
         // fingers again (the stylus may be lost or flat).
         var fingerHinted = false
+        ink.onStylus = {
+            if (Stylus.used(this)) {
+                ink.fingersDraw = false
+                updateModeButton()
+                Toast.makeText(this, R.string.fingers_draw_off, Toast.LENGTH_SHORT).show()
+            } else if (!modeButton.isVisible) {
+                updateModeButton()
+            }
+        }
+        modeButton.setOnClickListener { setFingersDraw(!ink.fingersDraw) }
+        updateModeButton()
         ink.onFingerIgnored = {
             if (!fingerHinted) {
                 fingerHinted = true

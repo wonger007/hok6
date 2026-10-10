@@ -19,9 +19,10 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
+import org.json.JSONArray
 import java.util.Locale
 
-/** The Chinese voices Hok6 speaks with, best first: [lang] "yue" (Cantonese) or "cmn" (Mandarin). */
+/** The voices Hok6 speaks with, best first: [lang] "yue" (Cantonese), "cmn" (Mandarin), "ja" (Japanese) or "ko" (Korean). */
 object Voices {
     const val GOOGLE_TTS = "com.google.android.tts"
     private const val KEY_ENGINE = "voice_engine"
@@ -82,9 +83,12 @@ object Voices {
     fun open(context: Context, onInit: TextToSpeech.OnInitListener): TextToSpeech =
         engine(context)?.let { TextToSpeech(context, onInit, it) } ?: TextToSpeech(context, onInit)
 
-    fun locales(lang: String) =
-        if (lang == "yue") listOf(Locale("yue", "HK"), Locale("zh", "HK"))
-        else listOf(Locale.SIMPLIFIED_CHINESE, Locale.TRADITIONAL_CHINESE)
+    fun locales(lang: String) = when (lang) {
+        "yue" -> listOf(Locale("yue", "HK"), Locale("zh", "HK"))
+        "ja" -> listOf(Locale.JAPAN)
+        "ko" -> listOf(Locale.KOREA)
+        else -> listOf(Locale.SIMPLIFIED_CHINESE, Locale.TRADITIONAL_CHINESE)
+    }
 
     fun find(engine: TextToSpeech, lang: String) =
         locales(lang).firstOrNull { engine.isLanguageAvailable(it) >= TextToSpeech.LANG_AVAILABLE }
@@ -132,16 +136,43 @@ object Voices {
  * only the handwriting models (downloaded here) and the voices (added in Android's settings) come from outside.
  */
 object Downloads {
-    val LANGS = listOf("yue", "cmn")
+    val LANGS = listOf("yue", "cmn", "ja", "ko")
+
+    /** The language's name, e.g. "Japanese". */
+    fun name(context: Context, lang: String) = context.getString(when (lang) {
+        "cmn" -> R.string.mandarin
+        "ja" -> R.string.japanese
+        "ko" -> R.string.korean
+        else -> R.string.cantonese
+    })
+    private const val KEY_LANGS = "langs"
+    private const val KEY_LANG = "lang"
     private const val KEY_SETUP_DONE = "setup_done"
     private const val KEY_NO_REMIND = "no_download_reminders"
 
-    enum class Need { HANDWRITING, VOICE }
+    /** What a feature can find missing and offer to get (handwriting is offered on the page itself, without asking). */
+    enum class Need { VOICE }
 
     /** Handwriting downloads under way, by language, with who to tell when each ends (null error = done). */
     private val downloading = HashMap<String, MutableList<(Throwable?) -> Unit>>()
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /**
+     * The languages the user learns, ticked on the welcome screen or in Settings: "yue" (Cantonese) and/or "cmn"
+     * (Mandarin). Kept with writing practice's data (as JSON, which the page reads too), so they're in backups.
+     * Until they're chosen, the language writing practice last used (Cantonese at first).
+     */
+    fun languages(context: Context): List<String> {
+        val store = TrainingStore(context)
+        val chosen = store.get(KEY_LANGS)?.let { runCatching { JSONArray(it) }.getOrNull() }
+            ?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty().filter { it in LANGS }
+        if (chosen.isNotEmpty()) return chosen
+        return listOf(store.get(KEY_LANG)?.trim('"')?.takeIf { it in LANGS } ?: "yue")
+    }
+
+    fun setLanguages(context: Context, langs: List<String>) =
+        TrainingStore(context).set(KEY_LANGS, JSONArray(LANGS.filter { it in langs }).toString())
 
     /** Whether the welcome screen has been through (finished or skipped). */
     fun setupDone(context: Context) = prefs(context).getBoolean(KEY_SETUP_DONE, false)
@@ -164,7 +195,7 @@ object Downloads {
     /** Downloads the handwriting model for [lang] (once, however many ask); [onDone] gets null or the error. */
     fun downloadHandwriting(lang: String, onDone: (Throwable?) -> Unit = {}) {
         downloading[lang]?.let { it += onDone; return }
-        val model = Handwriting.model(lang) ?: return onDone(IllegalStateException("no handwriting model for Chinese"))
+        val model = Handwriting.model(lang) ?: return onDone(IllegalStateException("no handwriting model for this language"))
         downloading[lang] = mutableListOf(onDone)
         fun finish(error: Throwable?) = downloading.remove(lang)?.forEach { it(error) }
         RemoteModelManager.getInstance().download(model, DownloadConditions.Builder().build())
@@ -178,9 +209,8 @@ object Downloads {
      */
     fun ask(activity: AppCompatActivity, need: Need, lang: String, onDownload: () -> Unit) {
         if (!remind(activity) || activity.isFinishing) return
-        val language = activity.getString(if (lang == "yue") R.string.cantonese else R.string.mandarin)
+        val language = name(activity, lang)
         val (title, message, button) = when (need) {
-            Need.HANDWRITING -> Triple(R.string.ask_hand_title, R.string.ask_hand, R.string.ask_download)
             Need.VOICE -> Triple(R.string.ask_voice_title, R.string.ask_voice, R.string.ask_add_voice)
         }
         val box = CheckBox(activity).apply { setText(R.string.ask_never) }
@@ -195,6 +225,29 @@ object Downloads {
             }
             .setNegativeButton(R.string.ask_not_now) { _, _ -> if (box.isChecked) setRemind(activity, false) }
             .show()
+    }
+}
+
+/**
+ * The languages to learn, on the welcome screen and in Settings: ticks the saved ones in [box] and saves changes,
+ * then calls [onChange] (to check the downloads for them). At least one stays ticked: the last can't be unticked.
+ */
+fun bindLanguageChoice(box: View, onChange: () -> Unit) {
+    val context = box.context
+    val boxes = mapOf(
+        "yue" to box.findViewById<CheckBox>(R.id.lang_yue), "cmn" to box.findViewById<CheckBox>(R.id.lang_cmn),
+        "ja" to box.findViewById<CheckBox>(R.id.lang_ja), "ko" to box.findViewById<CheckBox>(R.id.lang_ko),
+    )
+    fun lockLast() = boxes.values.forEach { it.isEnabled = !(it.isChecked && boxes.values.count { b -> b.isChecked } == 1) }
+    val saved = Downloads.languages(context)
+    boxes.forEach { (lang, b) -> b.isChecked = lang in saved }
+    lockLast()
+    boxes.values.forEach { b ->
+        b.setOnCheckedChangeListener { _, _ ->
+            lockLast()
+            Downloads.setLanguages(context, boxes.filterValues { it.isChecked }.keys.toList())
+            onChange()
+        }
     }
 }
 
@@ -216,15 +269,18 @@ class DownloadList(
     private val hand = Downloads.LANGS.associateWith { State.CHECKING }.toMutableMap()
     private val voice = Downloads.LANGS.associateWith { State.CHECKING }.toMutableMap()
     private var tts: TextToSpeech? = null
+    /** Only the chosen languages are listed and downloaded; [check] picks up a change. */
+    private var langs = Downloads.languages(activity)
+    private val states get() = langs.map { hand[it] } + langs.map { voice[it] }
 
     init {
         activity.lifecycle.addObserver(this)
         render()
     }
 
-    val allReady get() = (hand.values + voice.values).all { it == State.READY }
-    private val checking get() = (hand.values + voice.values).any { it == State.CHECKING }
-    private val downloading get() = hand.values.any { it == State.DOWNLOADING }
+    val allReady get() = states.all { it == State.READY }
+    private val checking get() = states.any { it == State.CHECKING }
+    private val downloading get() = langs.any { hand[it] == State.DOWNLOADING }
 
     override fun onResume(owner: LifecycleOwner) = check()
 
@@ -234,7 +290,8 @@ class DownloadList(
     }
 
     fun check() {
-        for (lang in Downloads.LANGS) {
+        langs = Downloads.languages(activity)
+        for (lang in langs) {
             if (Downloads.isDownloading(lang)) {
                 hand[lang] = State.DOWNLOADING
                 Downloads.downloadHandwriting(lang) { done(lang, it) }
@@ -247,12 +304,12 @@ class DownloadList(
         }
         // A new engine each time, so voices added meanwhile are seen.
         tts?.shutdown()
-        Downloads.LANGS.forEach { voice[it] = State.CHECKING }
+        langs.forEach { voice[it] = State.CHECKING }
         var engineHere: TextToSpeech? = null
         engineHere = Voices.open(activity) { status ->
             val e = engineHere ?: return@open
             if (e !== tts) return@open
-            for (lang in Downloads.LANGS) {
+            for (lang in langs) {
                 voice[lang] = when {
                     status != TextToSpeech.SUCCESS || Voices.find(e, lang) == null -> State.MISSING
                     Voices.installed(e, lang) -> State.READY
@@ -267,13 +324,13 @@ class DownloadList(
 
     /** Downloads the missing handwriting models, then opens the voice screen if a voice is missing. */
     fun downloadAll() {
-        for (lang in Downloads.LANGS) {
+        for (lang in langs) {
             if (hand[lang] != State.MISSING && hand[lang] != State.FAILED) continue
             hand[lang] = State.DOWNLOADING
             Downloads.downloadHandwriting(lang) { done(lang, it) }
         }
         render()
-        if (voice.values.any { it == State.MISSING || it == State.ONLINE }) Voices.install(activity)
+        if (langs.any { voice[it] == State.MISSING || voice[it] == State.ONLINE }) Voices.install(activity)
     }
 
     private fun done(lang: String, error: Throwable?) {
@@ -285,10 +342,16 @@ class DownloadList(
         container.removeAllViews()
         row(State.READY, R.string.need_dictionary, R.string.need_built_in)
         row(State.READY, R.string.need_characters, R.string.need_built_in)
-        row(hand["yue"], R.string.need_hand_yue, handNote(hand["yue"]))
-        row(hand["cmn"], R.string.need_hand_cmn, handNote(hand["cmn"]))
-        row(voice["yue"], R.string.need_voice_yue, voiceNote(voice["yue"]))
-        row(voice["cmn"], R.string.need_voice_cmn, voiceNote(voice["cmn"]))
+        for (lang in langs) {
+            val (handName, voiceName) = when (lang) {
+                "cmn" -> R.string.need_hand_cmn to R.string.need_voice_cmn
+                "ja" -> R.string.need_hand_ja to R.string.need_voice_ja
+                "ko" -> R.string.need_hand_ko to R.string.need_voice_ko
+                else -> R.string.need_hand_yue to R.string.need_voice_yue
+            }
+            row(hand[lang], handName, handNote(hand[lang]))
+            row(voice[lang], voiceName, voiceNote(voice[lang]))
+        }
         onChange(allReady, checking, downloading)
     }
 

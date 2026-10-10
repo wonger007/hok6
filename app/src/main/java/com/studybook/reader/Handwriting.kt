@@ -30,10 +30,10 @@ class Handwriting {
 
     /**
      * [strokes] is `[[x, y, t, x, y, t, …], …]` (t in milliseconds) on a writing area [width] × [height];
-     * [lang] "yue" (traditional, Hong Kong) or "cmn" (simplified). Calls [onResult] on the main thread.
+     * [lang] "yue" (traditional, Hong Kong), "cmn" (simplified), "ja" or "ko". Calls [onResult] on the main thread.
      */
     fun recognize(lang: String, strokes: JSONArray, width: Float, height: Float, onResult: (Result) -> Unit) {
-        val model = model(lang) ?: return onResult(Result.Failed("handwriting recognition isn't available for Chinese"))
+        val model = model(lang) ?: return onResult(Result.Failed("handwriting recognition isn't available for this language"))
         val tag = model.modelIdentifier.languageTag
         if (tag in ready) return run(tag, model, strokes, width, height, onResult)
         if (Downloads.isDownloading(lang)) {
@@ -81,9 +81,14 @@ class Handwriting {
     }
 
     companion object {
-        /** Models to try, best first: Hong Kong traditional characters for Cantonese, simplified for Mandarin. */
-        private fun tags(lang: String) =
-            if (lang == "cmn") listOf("zh-Hani-CN", "zh-Hani", "zh-Hani-TW") else listOf("zh-Hani-HK", "zh-Hani-TW", "zh-Hani")
+        /** Models to try, best first: Hong Kong traditional characters for Cantonese, simplified for Mandarin; Japanese
+         *  (kanji and kana) and Korean (hangul and hanja) have one each. */
+        private fun tags(lang: String) = when (lang) {
+            "cmn" -> listOf("zh-Hani-CN", "zh-Hani", "zh-Hani-TW")
+            "ja" -> listOf("ja")
+            "ko" -> listOf("ko")
+            else -> listOf("zh-Hani-HK", "zh-Hani-TW", "zh-Hani")
+        }
 
         fun model(lang: String): DigitalInkRecognitionModel? = tags(lang).firstNotNullOfOrNull { tag ->
             runCatching { DigitalInkRecognitionModelIdentifier.fromLanguageTag(tag) }.getOrNull()

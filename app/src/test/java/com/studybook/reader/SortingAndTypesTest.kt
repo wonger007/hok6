@@ -47,11 +47,11 @@ class SortingAndTypesTest {
 
     @Test
     fun chineseDetection() {
-        assertTrue(isChinese("你"))
-        assertTrue(isChinese("咗"))
-        assertTrue(isChinese("𠝹")) // outside the Basic Multilingual Plane
-        assertFalse(isChinese("A"))
-        assertFalse(isChinese("，"))
-        assertFalse(isChinese("1"))
+        assertTrue(isPracticeChar("你"))
+        assertTrue(isPracticeChar("咗"))
+        assertTrue(isPracticeChar("𠝹")) // outside the Basic Multilingual Plane
+        assertFalse(isPracticeChar("A"))
+        assertFalse(isPracticeChar("，"))
+        assertFalse(isPracticeChar("1"))
     }
 }

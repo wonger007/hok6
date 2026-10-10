@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages the user learns, on the welcome screen and in Settings (see bindLanguageChoice). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/language_choice"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <CheckBox
+        android:id="@+id/lang_yue"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/language_yue"
+        android:textSize="@dimen/text_body" />
+
+    <CheckBox
+        android:id="@+id/lang_cmn"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/language_cmn"
+        android:textSize="@dimen/text_body" />
+
+    <CheckBox
+        android:id="@+id/lang_ja"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/language_ja"
+        android:textSize="@dimen/text_body" />
+
+    <CheckBox
+        android:id="@+id/lang_ko"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/language_ko"
+        android:textSize="@dimen/text_body" />
+</LinearLayout>

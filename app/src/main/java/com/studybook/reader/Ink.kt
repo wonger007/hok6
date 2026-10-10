@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.widget.AppCompatImageView
@@ -194,6 +195,33 @@ class InkDocument private constructor(private val file: File) {
     }
 }
 
+/**
+ * Stylus or finger, for writing on pages and in writing practice. On a device whose screen can't take a stylus,
+ * fingers always draw. On one that can, the choice is a toggle in the title bar, remembered; the first time a stylus
+ * touches the screen Hok6 switches to it (only the stylus writes, fingers scroll, so a hand can rest on the page).
+ */
+object Stylus {
+    private const val KEY_FINGERS = "fingers_draw"
+    private const val KEY_USED = "stylus_used"
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Whether a stylus can be used: the screen takes one, or one has been used (e.g. a Bluetooth stylus). */
+    fun supported(context: Context): Boolean = prefs(context).getBoolean(KEY_USED, false) ||
+        InputDevice.getDeviceIds().any { InputDevice.getDevice(it)?.supportsSource(InputDevice.SOURCE_STYLUS) == true }
+
+    fun fingersDraw(context: Context) = !supported(context) || prefs(context).getBoolean(KEY_FINGERS, true)
+
+    fun setFingersDraw(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_FINGERS, on).apply()
+
+    /** A stylus touched the screen. The first time ever, switches to stylus mode and returns true. */
+    fun used(context: Context): Boolean {
+        if (prefs(context).getBoolean(KEY_USED, false)) return false
+        prefs(context).edit().putBoolean(KEY_USED, true).putBoolean(KEY_FINGERS, false).apply()
+        return true
+    }
+}
+
 /** Shared tracing settings for the chapter screen. */
 class Ink(context: Context) {
     val density = context.resources.displayMetrics.density
@@ -203,10 +231,12 @@ class Ink(context: Context) {
     var tool = InkTool.PEN
     var color = PEN_COLORS[0]
     var widthDp = PEN_SIZES[1]
-    /** Once a stylus is used, fingers go back to scrolling and only the stylus draws (until fingers are let draw). */
-    var stylusSeen = false
+    /** Whether fingers draw too, or only the stylus does and fingers scroll (see [Stylus]). */
+    var fingersDraw = Stylus.fingersDraw(context)
     /** A finger touched the page while only the stylus draws, e.g. to say how to draw with fingers again. */
     var onFingerIgnored: (() -> Unit)? = null
+    /** The stylus touched the page (the first time ever, Hok6 switches to stylus mode: see [Stylus.used]). */
+    var onStylus: (() -> Unit)? = null
     var document: InkDocument? = null
 
     companion object {
@@ -246,8 +276,9 @@ class InkSurface(private val view: View, private val ink: Ink) {
         val doc = ink.document
         if (!ink.active || doc == null || view.width == 0) return false
         val toolType = ev.getToolType(0)
-        if (toolType == MotionEvent.TOOL_TYPE_STYLUS || toolType == MotionEvent.TOOL_TYPE_ERASER) ink.stylusSeen = true
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN && ink.stylusSeen && toolType == MotionEvent.TOOL_TYPE_FINGER) {
+        val stylus = toolType == MotionEvent.TOOL_TYPE_STYLUS || toolType == MotionEvent.TOOL_TYPE_ERASER
+        if (stylus && ev.actionMasked == MotionEvent.ACTION_DOWN) ink.onStylus?.invoke()
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && !ink.fingersDraw && toolType == MotionEvent.TOOL_TYPE_FINGER) {
             ink.onFingerIgnored?.invoke()
             return false
         }

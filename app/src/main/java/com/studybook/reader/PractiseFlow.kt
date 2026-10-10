@@ -47,22 +47,22 @@ class PractiseFlow(
         }
     }
 
-    /** Shows the Chinese characters of a PDF page; the one under a long-press (x, y in points) comes pre-selected. */
+    /** Shows the characters to practise on a PDF page; the one under a long-press (x, y in points) comes pre-selected. */
     fun pickFromPdf(page: Int, x: Float?, y: Float?) {
         val glyphsJob = pdfGlyphs ?: return
         activity.lifecycleScope.launch {
             var glyphs = glyphsJob.await().getOrNull(page).orEmpty()
             // A scanned page has no text layer: recognise the characters from the page image instead.
-            val recognised = PdfText.chineseCharacters(glyphs).isEmpty()
+            val recognised = PdfText.practiceCharacters(glyphs).isEmpty()
             if (recognised) glyphs = recognisedPages[page] ?: recognisePage(page).also { recognisedPages[page] = it }
             val pressed = if (x != null && y != null) PdfText.glyphAt(glyphs, x, y, slop = 6f) else null
             if (x != null && pressed == null) {
                 Toast.makeText(activity, R.string.practise_miss, Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            val preselected = pressed?.text?.let { chineseIn(it) }.orEmpty().toSet()
+            val preselected = pressed?.text?.let { practiceCharsIn(it) }.orEmpty().toSet()
             val scope = activity.getString(R.string.practise_from_page, page + 1, pdf.pageCount)
-            PracticePicker.show(activity, PdfText.chineseCharacters(glyphs), preselected, scope, recognised) { practise(it) }
+            PracticePicker.show(activity, PdfText.practiceCharacters(glyphs), preselected, scope, recognised) { practise(it) }
         }
     }
 
@@ -74,7 +74,7 @@ class PractiseFlow(
         val bitmap = suspendCancellableCoroutine<Bitmap?> { cont -> pdf.renderPage(page, pixels) { cont.resume(it) } }
             ?: return emptyList()
         return try {
-            PdfOcr.recognise(bitmap, widthPoints.toFloat() / pixels)
+            PdfOcr.recognise(bitmap, widthPoints.toFloat() / pixels, Downloads.languages(activity))
         } finally {
             bitmap.recycle()
         }
@@ -86,22 +86,22 @@ class PractiseFlow(
         if (offset !in text.indices) return
         val cp = Character.codePointAt(text, offset)
         val tapped = String(Character.toChars(cp))
-        if (!isChinese(tapped)) {
+        if (!isPracticeChar(tapped)) {
             Toast.makeText(activity, R.string.practise_miss, Toast.LENGTH_SHORT).show()
             return
         }
         val start = text.lastIndexOf('\n', offset - 1).let { if (it < 0) 0 else it + 1 }
         val end = text.indexOf('\n', offset).let { if (it < 0) text.length else it }
-        PracticePicker.show(activity, chineseIn(text.subSequence(start, end)), setOf(tapped),
+        PracticePicker.show(activity, practiceCharsIn(text.subSequence(start, end)), setOf(tapped),
             activity.getString(R.string.practise_from_paragraph)) { practise(it) }
     }
 
     /** Offers all the characters of the Word document. */
-    fun pickAllFromDocx() = PracticePicker.show(activity, chineseIn(docxText.text), emptySet(),
+    fun pickAllFromDocx() = PracticePicker.show(activity, practiceCharsIn(docxText.text), emptySet(),
         activity.getString(R.string.practise_from_document)) { practise(it) }
 
-    private fun chineseIn(text: CharSequence): List<String> =
-        text.codePoints().toArray().map { String(Character.toChars(it)) }.filter(::isChinese).distinct()
+    private fun practiceCharsIn(text: CharSequence): List<String> =
+        text.codePoints().toArray().map { String(Character.toChars(it)) }.filter(::isPracticeChar).distinct()
 
     /** Opens writing practice with a worksheet for these characters. */
     private fun practise(characters: List<String>) {
@@ -128,7 +128,7 @@ class PractiseFlow(
             if (item.itemId != R.id.practise_selection) return false
             val start = minOf(docxText.selectionStart, docxText.selectionEnd).coerceAtLeast(0)
             val end = maxOf(docxText.selectionStart, docxText.selectionEnd).coerceAtLeast(0)
-            val characters = chineseIn(docxText.text.subSequence(start, end))
+            val characters = practiceCharsIn(docxText.text.subSequence(start, end))
             if (characters.isEmpty()) {
                 Toast.makeText(activity, R.string.practise_no_chinese, Toast.LENGTH_SHORT).show()
             } else {

@@ -21,7 +21,12 @@ import java.util.Locale
 object PageDrawing {
     fun draw(canvas: Canvas, json: String, pageWidth: Float) {
         val page = JSONObject(json)
-        val locale = if (page.optString("lang") == "cmn") Locale.SIMPLIFIED_CHINESE else Locale("zh", "HK")
+        val locale = when (page.optString("lang")) {
+            "cmn" -> Locale.SIMPLIFIED_CHINESE
+            "ja" -> Locale.JAPANESE
+            "ko" -> Locale.KOREAN
+            else -> Locale("zh", "HK")
+        }
         val pathData = page.getJSONArray("paths")
         val paths = arrayOfNulls<Path>(pathData.length())
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }

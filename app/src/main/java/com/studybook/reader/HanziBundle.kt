@@ -75,10 +75,13 @@ class HanziBundle(
 
     companion object {
         const val ASSET = "hanzi.bin"
+        /** Japanese kanji and kana, and Korean hanja (AnimCJK), in the same layout. */
+        const val JAPANESE = "kanji.bin"
+        const val KOREAN = "hanja.bin"
 
-        /** Opens the bundle from the app's assets; it is stored uncompressed in the APK so it can be read in place. */
-        fun open(context: android.content.Context): HanziBundle {
-            val fd = context.assets.openFd(ASSET)
+        /** Opens a bundle from the app's assets; it is stored uncompressed in the APK so it can be read in place. */
+        fun open(context: android.content.Context, asset: String = ASSET): HanziBundle {
+            val fd = context.assets.openFd(asset)
             return HanziBundle(FileInputStream(fd.fileDescriptor).channel, fd.startOffset, fd)
         }
     }

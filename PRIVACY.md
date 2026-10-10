@@ -1,6 +1,6 @@
 # Hok6 privacy policy
 
-*Last updated: 8 October 2026*
+*Last updated: 10 October 2026*
 
 Hok6 is a study app for your own textbook. It has no accounts, no ads, no analytics and no tracking, and its developer receives none of your data.
 
@@ -12,6 +12,12 @@ Your book, your handwriting, tracing, notes, settings and favourites are kept on
 
 - **Handwriting and text recognition** use Google's on-device ML Kit. The first time you use handwriting, its recognition model is downloaded from Google. Recognition then happens on your tablet; your handwriting and pages are not sent anywhere. ML Kit's usage reporting to Google is switched off in Hok6.
 - **Spoken words** use the text-to-speech voice installed on your tablet (usually Google's Speech Services). The voice is provided by that app under its own privacy policy.
+
+## Checking for updates
+
+Hok6 only connects to check for a new version when you tap **Check for updates** on its About page: through Google
+Play if you installed Hok6 from there, or by asking GitHub for the latest release if you installed it from GitHub.
+Like any web request, these see your device's internet address; Hok6 sends nothing else.
 
 ## Sharing
 

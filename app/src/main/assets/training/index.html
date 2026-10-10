@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Writing practice</title>
+  <title>Practice &amp; Quiz</title>
   <link rel="stylesheet" href="style.css">
   <script src="hanzi-writer.min.js"></script>
   <script src="core.js"></script>
@@ -15,12 +15,11 @@
 <section id="home" class="view">
   <header class="bar">
     <button class="icon" id="homeBack" aria-label="Back">←</button>
-    <h1>Writing practice</h1>
+    <h1>Practice &amp; Quiz</h1>
     <div class="spacer"></div>
-    <div class="lang" role="radiogroup" aria-label="Language">
-      <label><input type="radio" name="lang" value="yue" checked><span>廣東話 Cantonese</span></label>
-      <label><input type="radio" name="lang" value="cmn"><span>普通話 Mandarin</span></label>
-    </div>
+    <!-- One button per language ticked in Settings (filled in by app.js), shown when there are two or more. -->
+    <div class="lang" id="langSwitch" role="radiogroup" aria-label="Language" hidden></div>
+    <button class="tbtn more-btn" id="homeMoreBtn" aria-label="More" aria-haspopup="menu" hidden>⋮</button>
   </header>
 
   <main class="home-main" id="homeMain" data-tab="practice">
@@ -39,30 +38,33 @@
         <textarea id="fChars" rows="3" placeholder="e.g. 你好 謝謝 唔該 — or type English: thank you, good morning"></textarea>
         <small>One page per word (separate words with spaces): stroke order, a row to trace, then rows to write it.</small>
       </label>
-      <div id="recentRow" class="recent" hidden>
-        <span class="muted">Recent — tap to practice again:</span>
-        <div id="recentChips" class="recent-chips"></div>
-      </div>
       <!-- English typed in the box above is looked up here, right under it, so it's clear the words are to tap. -->
       <div id="translateBox" class="tr-box">
         <h3>English → <span id="trLang">廣東話 Cantonese</span> <span class="tr-tap">— tap a word to use it</span></h3>
-        <p id="trHint" class="muted">Type English above (e.g. <i>thank you, good morning</i>) and Chinese words appear here. Tap one to use it.</p>
+        <!-- Other languages to look English up in too, each a toggle (the one being practised always is). -->
+        <div id="trLangs" class="filters lang-filters tr-langs" role="group" aria-label="Also look up in"></div>
+        <p id="trHint" class="muted">Type English above (e.g. <i>thank you, good morning</i>) and words in the language you're learning appear here. Tap one to use it.</p>
         <div id="trResults"></div>
       </div>
       </div>
-      <!-- Drawing: write a character, tap the right one, and it joins what to practice. -->
+      <!-- Drawing: write a character (or a word, one character per square), tap the right one, and it joins what to
+           practice. -->
       <div id="drawArea" class="draw-area" hidden>
+        <div id="hCells" class="filters hand-cells" role="radiogroup" aria-label="Squares on the pad">
+          <span class="muted">Squares:</span>
+          <button type="button" data-cells="1">1</button>
+          <button type="button" data-cells="2">2</button>
+          <button type="button" data-cells="3">3</button>
+          <button type="button" data-cells="4">4</button>
+        </div>
         <div class="hand-wrap">
-          <svg class="writer-grid" viewBox="0 0 100 100" aria-hidden="true">
-            <g stroke="#D8D8D8" stroke-width="0.5" stroke-dasharray="2 2">
-              <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/>
-              <line x1="50" y1="0" x2="50" y2="100"/><line x1="0" y1="50" x2="100" y2="50"/>
-            </g>
-          </svg>
+          <svg id="hGrid" class="writer-grid" aria-hidden="true"></svg>
           <canvas id="hCanvas"></canvas>
         </div>
         <div class="hand-side">
-          <p id="hStatus" class="status">Write a character in the square, then tap the right one below.</p>
+          <p id="hStatus" class="status">Write a character in each square, then tap the right one below.</p>
+          <!-- When this language's handwriting recognition isn't on the device yet: get it here (no pop-up). -->
+          <button type="button" id="hDownload" class="primary small" hidden>⬇ Download handwriting</button>
           <div id="hCands" class="hand-cands"></div>
           <div class="hand-buttons">
             <button type="button" id="hClear">Clear</button>
@@ -93,11 +95,11 @@
         </fieldset>
         <label class="check"><input id="fStrokes" type="checkbox" checked> Start with the stroke order</label>
         <label class="check"><input id="fRoman" type="checkbox" checked> Show <span class="romanName">Jyutping</span> under the word</label>
-        <label class="check"><input id="fName" type="checkbox" checked> Write “姓名：” (name) on top</label>
+        <label class="check"><input id="fName" type="checkbox" checked> Write “<span class="nameLabel">姓名：</span>” (name) on top</label>
       </details>
     </form>
 
-    <p id="quizTip" class="muted quiz-tip tab-quiz" hidden>📝 <b>Quiz</b>: on a homework page, tap <b>Practice Selector</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>. The quiz appears here.</p>
+    <p id="quizTip" class="muted quiz-tip tab-quiz" hidden>📝 <b>Quiz</b>: on a homework page, tap <b>Practice Selector</b>, tap a character, choose the ones you want, then tap <b>Add to quiz</b>. Or tap <b>📝</b> next to a word in History or Bookmarks on the Practice tab. The quiz appears here.</p>
     <section class="card tab-quiz" id="quizCard" hidden>
       <div class="card-head">
         <h2>Quiz</h2>
@@ -107,15 +109,15 @@
       <div id="quizStart" class="quiz-start" hidden>
         <fieldset class="field">
           <legend>Flash cards</legend>
-          <label class="check"><input type="radio" name="fcDir" value="zh" checked> Chinese → meaning</label>
-          <label class="check"><input type="radio" name="fcDir" value="en"> English → Chinese</label>
-          <label class="check"><input type="radio" name="fcDir" value="sound"> Sound → Chinese</label>
+          <label class="check"><input type="radio" name="fcDir" value="zh" checked> Word → meaning</label>
+          <label class="check"><input type="radio" name="fcDir" value="en"> English → word</label>
+          <label class="check"><input type="radio" name="fcDir" value="sound"> Sound → word</label>
           <button type="button" class="primary" id="fcStart">Start flash cards</button>
         </fieldset>
         <fieldset class="field">
           <legend>Written quiz</legend>
           <label class="check"><input type="radio" name="wqPrompt" value="en" checked> English meaning</label>
-          <label class="check"><input type="radio" name="wqPrompt" value="zh"> Chinese character
+          <label class="check"><input type="radio" name="wqPrompt" value="zh"> The character
             <select id="wqTimer" aria-label="Hide the character after">
               <option value="0">stays showing</option>
               <option value="3">hidden after 3 s</option>
@@ -142,6 +144,8 @@
         <button data-filter="chars">Characters</button>
         <button data-filter="bookmarks">★ Bookmarks</button>
       </div>
+      <!-- One toggle per language in the history, when there are two or more (filled in by app.js). -->
+      <div id="histLangs" class="filters lang-filters" role="group" aria-label="Languages shown" hidden></div>
       <ul id="histList" class="items"></ul>
       <p id="histEmpty" class="muted">Words and characters you practice appear here. Tap one to practice it again; tap ☆ to bookmark it.</p>
       <div id="backupRow" class="backup-row" hidden>
@@ -152,47 +156,6 @@
     </section>
 
 
-    <section class="card credits tab-practice">
-      <h2>About Hok6</h2>
-      <p><b>Hok6</b> (學, hok6) — where you learn, study, and imitate.</p>
-      <h3>Device settings</h3>
-      <p id="downloadsRow" hidden><button id="downloadsBtn" class="small">⚙ Settings…</button>
-        <span class="muted">download handwriting and voices for Cantonese and Mandarin, light or dark</span></p>
-      <p class="muted">Menu names differ a little between makers; if one isn't where it's shown, search for it in Settings.</p>
-      <ul class="settings">
-        <li><b>Chinese voices</b> for 🔊 and the Sound → Chinese quiz: Settings → System → Languages &amp; input →
-          Text-to-speech output → engine <b>Speech Services by Google</b> → ⚙ → Install voice data →
-          <b>Chinese (Hong Kong) / 粵語</b> for Cantonese and <b>Chinese (China) / 普通话</b> for Mandarin.</li>
-        <li><b>Internet once</b>: <b>Settings → Download all</b> (above, or ⋮ → Settings on the main screen; also
-          offered on first start) gets the handwriting models and opens the voice screen for you; after that Hok6
-          works offline. The dictionary is built in.</li>
-        <li><b>Backup</b> (nothing to set): your writing, tracing, history and quiz are kept in your book folder as
-          <b>Hok6 backup.json</b>, on the device, not in Google Drive. After reinstalling, choose the same book folder
-          and tap Restore. <b>Back up…</b> under History saves a copy anywhere else.</li>
-        <li><b>Install unknown apps</b> (for updates): Settings → Apps → Special app access → Install unknown apps →
-          the browser or Files app → Allow from this source. If Play Protect warns, tap More details → Install anyway.</li>
-        <li><b>Samsung tablets</b>: turn off <b>Auto Blocker</b> to install or update Hok6 (Settings → Security and
-          privacy → Auto Blocker). For voices, Samsung's own engine may have no Cantonese: install <b>Speech Recognition
-          and Synthesis from Google</b> from the Play Store, then Settings → General management → Text-to-speech →
-          Preferred engine → that one → ⚙ → Install voice data. A book on a microSD card: in the folder picker, tap ☰
-          and pick the SD card.</li>
-        <li><b>Stylus</b> (optional): once Hok6 sees a stylus, only the stylus writes and fingers scroll, so your hand
-          can rest on the screen. Lost the stylus? ⋮ → <b>☝ Fingers draw</b>.</li>
-      </ul>
-      <h3>Credits</h3>
-      <p>Stroke order animations and quizzes by <b>Hanzi Writer</b> (github.com/chanind/hanzi-writer, MIT).
-        Character data from <b>hanzi-writer-data</b> / <b>Make Me a Hanzi</b> (github.com/skishore/makemeahanzi),
-        derived from Arphic fonts, Arphic Public License.
-        Worksheet layout modelled on <b>chinese-character-worksheets</b> (github.com/12jr/chinese-character-worksheets).
-        Jyutping from <b>rime-cantonese</b> (github.com/rime/rime-cantonese, CC BY 4.0).
-        Pinyin from the Unicode <b>Unihan</b> database (Unicode License V3, © 1991–2026 Unicode, Inc.).
-        Handwriting recognition by Google <b>ML Kit Digital Ink Recognition</b> (ML Kit Terms).
-        English → Chinese from <b>CC-CEDICT</b> (mdbg.net, CC BY-SA 4.0) and <b>CC-Canto</b> (cantonese.org, CC BY-SA 3.0),
-        selected and reformatted for Hok6 and shared under CC BY-SA 4.0.
-        Built with <b>AndroidX</b>, <b>Media3</b> and <b>PdfBox-Android</b> (Apache 2.0).</p>
-      <p>Hok6 is © 2026 wonger007, open source under the Apache License 2.0: github.com/wonger007/hok6.</p>
-      <p class="muted">Characters marked ≈ are not in the stroke data; their stroke order is assembled from their parts and may differ slightly from the standard.</p>
-    </section>
   </main>
 </section>
 
@@ -203,15 +166,14 @@
     <h1 id="sheetTitle"></h1>
     <div class="spacer"></div>
     <div class="group">
+      <!-- Who writes: the stylus only (fingers scroll) or fingers too; only where the screen takes a stylus. -->
+      <button class="tbtn clear-btn" id="modeBtn" hidden>✍ Stylus</button>
       <button class="tbtn pen-btn" id="penBtn" aria-label="Pen colour"><i></i></button>
       <button class="tbtn size-btn" id="sizeBtn" aria-label="Pen thickness"><i></i></button>
       <button class="tbtn" id="eraserBtn" aria-label="Eraser">⌫</button>
       <button class="tbtn clear-btn" id="clearBtn" aria-label="Clear: erase all writing on screen">🗑 Clear</button>
     </div>
-    <div class="lang small" role="radiogroup" aria-label="Language">
-      <label><input type="radio" name="lang2" value="yue" checked><span>粵</span></label>
-      <label><input type="radio" name="lang2" value="cmn"><span>普</span></label>
-    </div>
+    <div class="lang small" id="langSwitch2" role="radiogroup" aria-label="Language" hidden></div>
     <button class="primary" id="printBtn">Export</button>
     <button class="tbtn more-btn" id="moreBtn" aria-label="More tools" aria-haspopup="menu">⋮</button>
   </header>
@@ -326,10 +288,17 @@
 </div>
 <!-- Less-used worksheet tools, under ⋮ so the title bar has room for the rest at full size. -->
 <div id="moreMenu" class="bar-menu" role="menu" hidden>
-  <button id="fingerBtn" role="menuitem" aria-label="Fingers draw or scroll: tap to switch">☝ Fingers draw</button>
+  <!-- Phones: the stylus / finger toggle lives here, as the title bar is full. -->
+  <button id="fingerBtn" role="menuitem" hidden>☝ Finger</button>
   <button id="viewBtn" role="menuitem">📄 Whole pages</button>
   <button class="page-only keep-open" id="zoomIn" role="menuitem">＋ Zoom in</button>
   <button class="page-only keep-open" id="zoomOut" role="menuitem">－ Zoom out</button>
+  <button class="native-only" id="aboutBtn2" role="menuitem">ℹ About Hok6</button>
+</div>
+<!-- The writing practice home screen's ⋮ menu: Settings, and About at the bottom. -->
+<div id="homeMenu" class="bar-menu" role="menu" hidden>
+  <button id="settingsBtn" role="menuitem">⚙ Settings</button>
+  <button id="aboutBtn" role="menuitem">ℹ About Hok6</button>
 </div>
 <div id="toast" class="toast" hidden></div>
 </body>

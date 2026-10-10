@@ -13,3 +13,12 @@ sections of README.md):
 - Jyutping readings from rime-cantonese: CC BY 4.0.
 - Readings and character data from the Unicode Unihan database: Unicode License V3
   (app/src/main/assets/training/UNICODE-LICENSE.txt).
+- Japanese and Korean stroke data (app/src/main/assets/kanji.bin, hanja.bin) from AnimCJK, derived from fonts by
+  Arphic Technology: Arphic Public License (app/src/main/assets/training/ARPHICPL.TXT; AnimCJK's own notice in
+  app/src/main/assets/training/ANIMCJK-COPYING.txt).
+- English → Japanese dictionary and Japanese readings adapted from JMdict and KANJIDIC2 (Electronic Dictionary
+  Research and Development Group, https://www.edrdg.org, CC BY-SA 4.0): the bundled files in
+  app/src/main/assets/training/dict-ja/ and the Japanese readings in training/readings/ are shared under CC BY-SA 4.0.
+- English → Korean dictionary adapted from kengdic (Joe Speigle, https://github.com/garfieldnate/kengdic): the bundled
+  files in app/src/main/assets/training/dict-ko/ are under the Mozilla Public License 2.0
+  (app/src/main/assets/training/MPL-2.0.txt); tools/build_assets.py shows how they are made from kengdic.tsv.

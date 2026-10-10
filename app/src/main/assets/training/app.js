@@ -78,7 +78,10 @@ const state = {
   color: '#1E88E5', // blue: shows up against the red title bar, unlike the red pen
   size: 1,
   tool: 'pen',
-  fingerDraw: store.get('fingerDraw', true),
+  // Stylus or finger, shared with the rest of Hok6 (Stylus in Ink.kt): on a screen that can't take a stylus, fingers
+  // always draw and there's no toggle.
+  stylusOk: Native && Native.stylusSupported ? Native.stylusSupported() : true,
+  fingerDraw: Native && Native.fingersDraw ? Native.fingersDraw() : store.get('fingerDraw', true),
   zoom: store.get('zoom', 1),
   speed: [1, 0.75, 0.5].includes(store.get('speed', 1)) ? store.get('speed', 1) : 1,
   view: IS_PHONE ? store.get('phoneView', 'row') : 'page',
@@ -122,8 +125,14 @@ function toast(msg, action) {
   toastTimer = setTimeout(() => { t.hidden = true; }, action ? 5000 : 2600);
 }
 
+/* Whether a character is practised in the current language (Han characters; kana in Japanese, hangul in Korean). */
 function isHan(ch) {
-  return /\p{Script=Han}/u.test(ch);
+  return Core.isPracticeChar(ch, state.lang);
+}
+
+/* The current language's details (name, reading, stroke data…): see Core.LANGS. */
+function langInfo() {
+  return Core.LANGS[state.lang] || Core.LANGS.yue;
 }
 
 // ---------------------------------------------------------------- readings (Jyutping / Pinyin)
@@ -146,30 +155,38 @@ function loadReadings(text) {
 }
 
 function readingsOf(ch, table) {
-  return Core.readingsIn(table[ch], state.lang);
+  return Core.charReadings(ch, table[ch], state.lang);
 }
 
 function romanName() {
-  return state.lang === 'yue' ? 'Jyutping' : 'Pinyin';
+  return langInfo().reading;
 }
 
 // ---------------------------------------------------------------- stroke data
 
 const charCache = new Map();
 
-function fetchRaw(ch) {
+/* Stroke data from one of the app's sets: zh (Chinese), ja (Japanese kanji and kana) or ko (Korean hanja). */
+function fetchRaw(ch, set = 'zh') {
   const hex = ch.codePointAt(0).toString(16);
-  return fetch('/hanzi/' + hex).then((r) => {
+  return fetch('/hanzi/' + (set === 'zh' ? '' : set + '/') + hex).then((r) => {
     if (!r.ok) throw new Error('missing');
     return r.json();
   });
 }
 
+/* A character's stroke data in the current language: its own forms first (Japanese 必, Korean hangul built from its
+   letters), then the Chinese data (Japanese and Korean use many of the same characters). */
 function loadChar(ch) {
-  if (!charCache.has(ch)) {
-    charCache.set(ch, fetchRaw(ch).catch(() => Core.compose(ch, fetchRaw)).catch(() => null));
+  const set = langInfo().strokes;
+  const key = set + ch;
+  if (!charCache.has(key)) {
+    const chinese = () => fetchRaw(ch).catch(() => Core.compose(ch, fetchRaw));
+    const hangul = set === 'ko' && Core.hangulData(ch);
+    const own = hangul ? Promise.resolve(hangul) : set === 'zh' ? chinese() : fetchRaw(ch, set).catch(chinese);
+    charCache.set(key, own.catch(() => null));
   }
-  return charCache.get(ch);
+  return charCache.get(key);
 }
 
 // ---------------------------------------------------------------- drawing a worksheet page
@@ -227,7 +244,7 @@ function buildPage(ws, pageIndex, totalPages, table) {
   const right = left + cols * cell;
   const border = { stroke: '#000', 'stroke-width': 0.3 };
   line(root, left, 17, right, 17, border);
-  if (ws.opts.name) text(root, left, 15.4, '姓名：', { 'font-size': 4.2 });
+  if (ws.opts.name) text(root, left, 15.4, langInfo().nameLabel, { 'font-size': 4.2 });
   text(root, PAGE_W / 2, 15.2, word, { 'font-size': 7, 'text-anchor': 'middle' });
   if (ws.opts.roman) text(root, PAGE_W / 2, 21.6, romanOfText(word, table), { 'font-size': 3.8, 'text-anchor': 'middle', class: 'roman' });
   text(root, right, 15.4, `${pageIndex + 1}/${totalPages}`, { 'font-size': 3.6, 'text-anchor': 'end', class: 'head-latin' });
@@ -261,7 +278,7 @@ function buildPage(ws, pageIndex, totalPages, table) {
 
 async function renderPages() {
   const ws = state.ws;
-  const table = await loadReadings(ws.words.join(''));
+  const [table] = await Promise.all([loadReadings(ws.words.join('')), loadWordReadings(ws.words)]);
   const unique = [...new Set(ws.chars)];
   const loaded = await Promise.all(unique.map(loadChar));
   state.data = {};
@@ -484,16 +501,33 @@ function hitTest(svg, pt) {
   return ch ? { type: 'model', idx: state.ws.chars.indexOf(ch) } : null;
 }
 
+/* Stylus (only the stylus writes, fingers scroll) or finger (fingers write too); remembered for all of Hok6. The
+   toggle shows who writes now: in the title bar, or under ⋮ on phones. */
 function setFingerDraw(on, announce) {
+  if (!state.stylusOk) on = true;
   state.fingerDraw = on;
-  store.set('fingerDraw', on);
+  if (Native && Native.setFingersDraw) Native.setFingersDraw(on); else store.set('fingerDraw', on);
   $('pages').classList.toggle('finger-draw', on);
   $('rowView').classList.toggle('finger-draw', on);
-  $('fingerBtn').classList.toggle('sel', on);
-  // Says what a finger does now: write, or scroll (once a stylus is used, only the stylus writes).
-  $('fingerBtn').textContent = on ? '☝ Fingers draw' : '☝ Fingers scroll';
+  for (const b of [$('modeBtn'), $('fingerBtn')]) {
+    b.textContent = on ? '☝ Finger' : '✍ Stylus';
+    b.setAttribute('aria-label', on ? 'Fingers write too: tap so only the stylus writes'
+      : 'Only the stylus writes, fingers scroll: tap to let fingers write too');
+    b.hidden = !state.stylusOk;
+  }
   $('hFinger').hidden = on;
-  if (announce) toast(on ? 'Fingers draw — scroll with two fingers' : 'Stylus detected — fingers now scroll, the pen writes');
+  if (announce) toast(on ? '☝ Finger: fingers write too — scroll with two fingers' : '✍ Stylus: only the stylus writes — fingers scroll');
+}
+
+/* A stylus touched the screen: the first time ever, switch to stylus mode (and show the toggle, e.g. a Bluetooth
+   stylus on a screen that didn't say it takes one). */
+function stylusTouched() {
+  const first = Native && Native.stylusUsed ? Native.stylusUsed() : !store.get('stylusUsed', false);
+  if (!(Native && Native.stylusUsed)) store.set('stylusUsed', true);
+  if (first || !state.stylusOk) {
+    state.stylusOk = true;
+    setFingerDraw(first ? false : state.fingerDraw, first);
+  }
 }
 
 function setupInk(pages) {
@@ -527,10 +561,15 @@ function setupInk(pages) {
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (!state.fingerDraw) {
-        // Only the stylus writes now; once, say how to write with a finger again (e.g. the stylus is lost).
-        if (!state.fingerHinted && touches.size === 1 && e.target.closest && e.target.closest('svg[data-page]')) {
+        // Only the stylus writes, but a finger tap still opens a stroke-order square or says the word; a drag scrolls.
+        const tapSvg = touches.size === 1 && e.target.closest && e.target.closest('svg[data-page]');
+        const tapHit = tapSvg && hitTest(tapSvg, toPage(tapSvg, e));
+        if (tapHit) {
+          tap = { hit: tapHit, x: e.clientX, y: e.clientY, id: e.pointerId };
+        } else if (tapSvg && !state.fingerHinted) {
+          // Once, say how to write with a finger again (e.g. the stylus is lost).
           state.fingerHinted = true;
-          toast('Only the stylus writes; fingers scroll.', { label: '☝ Let fingers draw', run: () => setFingerDraw(true, true) });
+          toast('✍ Stylus: only the stylus writes; fingers scroll.', { label: '☝ Finger', run: () => setFingerDraw(true, true) });
         }
         return;
       }
@@ -542,7 +581,7 @@ function setupInk(pages) {
       }
       if (blockTouch) return;
     }
-    if (e.pointerType === 'pen' && state.fingerDraw) setFingerDraw(false, true);
+    if (e.pointerType === 'pen') stylusTouched();
 
     const svg = e.target.closest && e.target.closest('svg[data-page]');
     if (!svg) return;
@@ -667,7 +706,7 @@ function speak(textToSay, rate = state.speed) {
     Native.speak(textToSay, state.lang);
   } else if (window.speechSynthesis) {
     const u = new SpeechSynthesisUtterance(textToSay);
-    u.lang = state.lang === 'yue' ? 'zh-HK' : 'zh-CN';
+    u.lang = langInfo().html;
     u.rate = rate;
     speechSynthesis.speak(u);
   }
@@ -702,9 +741,38 @@ function toneLabel(reading) {
   return Core.toneLabel(reading, state.lang);
 }
 
-/* Romanization of a word: first reading of each character. */
-function romanOfText(textIn, table) {
-  return Array.from(textIn).map((c) => readingsOf(c, table)[0] || '?').join(' ');
+/* Dictionary readings of whole words, which per-character readings can't give (Japanese 日本 is にほん, not にちほん). */
+const wordReadings = new Map();
+
+/* Looks up the readings of these words (Japanese only: the others read character by character), for romanOfText. */
+async function loadWordReadings(words, lang = state.lang) {
+  if (lang !== 'ja') return;
+  await Promise.all(words.filter((w) => !wordReadings.has('ja' + w)).map(async (w) => {
+    const e = (await dictEntriesFor(w, 'ja')).find((x) => x[0] === w || x[1] === w);
+    wordReadings.set('ja' + w, e ? e[1] : null);
+  }));
+}
+
+/* Romanization of a word: first reading of each character. Japanese: the word's kana and its rōmaji; Korean: the
+   romanization of its hangul (hanja read as hangul first). Words in kana or hangul are read as Japanese or Korean
+   whatever the current language (History lists the words of every language). */
+function romanOfText(textIn, table, inLang = state.lang) {
+  const lang = Core.scriptLang(textIn) || inLang;
+  if (lang === 'ja') {
+    const kana = wordReadings.get('ja' + textIn) || Array.from(textIn).map((c) => {
+      if (!/\p{Script=Han}/u.test(c)) return c;
+      // On readings (katakana) are how kanji are usually read in longer words; drop the kana written after a kun one.
+      return Core.toHiragana((Core.readingsIn(table[c], 'ja')[0] || '?').replace(/\(.*\)/, ''));
+    }).join('');
+    const romaji = Core.kanaToRomaji(kana);
+    return kana === textIn ? romaji : `${kana} · ${romaji}`;
+  }
+  if (lang === 'ko') {
+    const hangul = Array.from(textIn).map((c) => (/\p{Script=Han}/u.test(c) ? Core.readingsIn(table[c], 'ko')[0] || '?' : c)).join('');
+    const roman = Core.romanizeHangul(hangul);
+    return hangul === textIn ? roman : `${hangul} · ${roman}`;
+  }
+  return Array.from(textIn).map((c) => Core.charReadings(c, table[c], lang)[0] || '?').join(' ');
 }
 
 // ---------------------------------------------------------------- history & bookmarks
@@ -715,11 +783,35 @@ function historyAll() {
   return store.get('history', {});
 }
 
-/* Updates (or creates) the history entry for a word or character. */
+/* The languages a history entry was practised in. Entries from before languages were recorded: kana is Japanese,
+   hangul Korean, and Han characters Chinese (whichever of Cantonese and Mandarin is being learned, else Cantonese). */
+function historyLangs(e) {
+  if (e.langs && e.langs.length) return e.langs;
+  const lang = Core.scriptLang(e.text);
+  if (lang) return [lang];
+  const chinese = learnedLangs().filter((l) => l === 'yue' || l === 'cmn');
+  return chinese.length ? chinese : ['yue'];
+}
+
+/* The language to read a history entry in: the current one if it was practised in it, else the one it was. */
+function entryLang(e) {
+  const langs = historyLangs(e);
+  return langs.includes(state.lang) ? state.lang : langs[0];
+}
+
+/* Practises a history entry again, in the language it was practised in (if that language is still being learned). */
+function practiseEntry(e) {
+  const lang = entryLang(e);
+  if (lang !== state.lang && learnedLangs().includes(lang)) setLang(lang);
+  practiseText(e.text, e.text, false);
+}
+
+/* Updates (or creates) the history entry for a word or character, noting the language it's practised in. */
 function touchHistory(textIn, update) {
   const h = historyAll();
   const e = h[textIn] || { text: textIn, first: Date.now(), count: 0 };
   e.last = Date.now();
+  if (!(e.langs || []).includes(state.lang)) e.langs = (e.langs || []).concat(state.lang);
   update(e);
   h[textIn] = e;
   const keys = Object.keys(h);
@@ -778,12 +870,12 @@ function listItem(t, table, e) {
   main.className = 'item-main';
   main.innerHTML = '<span class="item-text"></span><span class="item-sub"></span>';
   main.querySelector('.item-text').textContent = t;
-  const bits = [romanOfText(t, table)];
+  const bits = [romanOfText(t, table, entryLang(e || { text: t }))];
   if (e) bits.push(`${ago(e.last)} · ${e.count}×`);
   const q = quizNote(e);
   if (q) bits.push(q);
   main.querySelector('.item-sub').textContent = bits.join('  ·  ');
-  main.onclick = () => practiseText(t, t, false);
+  main.onclick = () => practiseEntry(e || { text: t });
   const say = document.createElement('button');
   say.className = 'icon';
   say.textContent = '🔊';
@@ -794,24 +886,94 @@ function listItem(t, table, e) {
   star.textContent = isBookmarked(t) ? '★' : '☆';
   star.setAttribute('aria-label', 'Bookmark ' + t);
   star.onclick = () => toggleBookmark(t);
-  li.append(main, say, star);
+  // 📝 adds it to the quiz (tinted while it's in the quiz; tap again to take it out).
+  const inQuiz = quizItems().includes(t);
+  const quizBtn = document.createElement('button');
+  quizBtn.className = 'icon quiz-add' + (inQuiz ? ' sel' : '');
+  quizBtn.textContent = '📝';
+  quizBtn.setAttribute('aria-label', inQuiz ? `Remove ${t} from the quiz` : `Add ${t} to the quiz`);
+  quizBtn.setAttribute('aria-pressed', String(inQuiz));
+  quizBtn.onclick = () => toggleQuizItem(t);
+  li.append(main, say, star, quizBtn);
+  // A word in the history (not only bookmarked) can be removed from it, with Undo.
+  if (e) {
+    const remove = document.createElement('button');
+    remove.className = 'icon remove';
+    remove.textContent = '✕';
+    remove.setAttribute('aria-label', 'Remove ' + t + ' from history');
+    remove.onclick = () => removeFromHistory(t);
+    li.append(remove);
+  }
   return li;
+}
+
+/* Removes one word or character from the history; the message offers Undo. Bookmarks and writing are kept. */
+function removeFromHistory(t) {
+  const h = historyAll();
+  const old = h[t];
+  if (!old) return;
+  delete h[t];
+  store.set('history', h);
+  renderLists();
+  toast(`Removed ${t} from history`, {
+    label: 'Undo',
+    run: () => { const now = historyAll(); now[t] = old; store.set('history', now); renderLists(); },
+  });
+}
+
+/* The languages whose history is hidden (their toggles turned off), remembered. */
+function hiddenHistoryLangs() {
+  return store.get('histLangsOff', []);
+}
+
+/* History entries the list shows: in a language whose toggle is on, and words or characters per the filter. */
+function shownHistory(h, filter) {
+  const off = hiddenHistoryLangs();
+  return Object.values(h)
+    .filter((e) => historyLangs(e).some((l) => !off.includes(l)))
+    .filter((e) => filter === 'all' || (filter === 'words' ? Array.from(e.text).length > 1 : Array.from(e.text).length === 1));
+}
+
+/* One toggle per language in the history (when there are two or more): tap to show or hide that language's words. */
+function renderHistoryLangs(h) {
+  const present = Core.LANG_CODES.filter((l) => Object.values(h).some((e) => historyLangs(e).includes(l)));
+  const row = $('histLangs');
+  row.hidden = present.length < 2;
+  row.innerHTML = '';
+  const off = hiddenHistoryLangs();
+  for (const l of present) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const on = !off.includes(l);
+    b.className = on ? 'sel' : '';
+    b.textContent = (on ? '✓ ' : '') + Core.LANGS[l].name;
+    b.setAttribute('aria-pressed', String(on));
+    b.onclick = () => {
+      store.set('histLangsOff', on ? off.concat(l) : off.filter((x) => x !== l));
+      renderLists();
+    };
+    row.appendChild(b);
+  }
+  return present;
 }
 
 async function renderLists() {
   const h = historyAll();
-  const table = await loadReadings(Object.keys(h).join('') + bookmarks().join(''));
+  const words = Object.keys(h).concat(bookmarks());
+  const [table] = await Promise.all([loadReadings(words.join('')),
+    loadWordReadings(words.filter((w) => entryLang(h[w] || { text: w }) === 'ja'), 'ja')]);
 
   const bm = bookmarks();
   const filter = state.historyFilter || 'all';
+  const present = renderHistoryLangs(h);
+  const off = hiddenHistoryLangs();
   // History and bookmarks share one list; the ★ Bookmarks tab shows bookmarks (practised or not), newest first.
   const items = filter === 'bookmarks'
-    ? bm.map((t) => h[t] || { text: t })
-    : Object.values(h)
-      .filter((e) => filter === 'all' || (filter === 'words' ? Array.from(e.text).length > 1 : Array.from(e.text).length === 1))
-      .sort((a, b) => b.last - a.last)
-      .slice(0, 100);
-  renderRecent(h, table);
+    ? bm.map((t) => h[t] || { text: t }).filter((e) => historyLangs(e).some((l) => !off.includes(l)))
+    : shownHistory(h, filter).sort((a, b) => b.last - a.last).slice(0, 100);
+  // Clear removes what's listed: all of it, or only the languages (and words or characters) shown.
+  const partial = filter !== 'all' || present.some((l) => off.includes(l));
+  $('histClear').textContent = partial ? 'Clear what\'s shown' : 'Clear history';
   const histList = $('histList');
   histList.innerHTML = '';
   for (const e of items) histList.appendChild(listItem(e.text, table, e.last ? e : null));
@@ -821,34 +983,32 @@ async function renderLists() {
     : 'Words and characters you practice appear here. Tap one to practice it again; tap ☆ to bookmark it.';
   $('bmPractise').hidden = filter !== 'bookmarks' || bm.length === 0;
   $('histClear').hidden = filter === 'bookmarks';
-  document.querySelectorAll('.filters button').forEach((b) => b.classList.toggle('sel', b.dataset.filter === filter));
+  document.querySelectorAll('.filters button[data-filter]').forEach((b) => b.classList.toggle('sel', b.dataset.filter === filter));
 }
 
-/* The words practised most recently, as chips under the practice box: one tap practises one again. */
-function renderRecent(h, table) {
-  const recent = Object.values(h).sort((a, b) => b.last - a.last).slice(0, 8);
-  const out = $('recentChips');
-  out.textContent = '';
-  for (const e of recent) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'recent-chip';
-    chip.innerHTML = '<span class="rc-word"></span><span class="rc-roman"></span>';
-    chip.querySelector('.rc-word').textContent = e.text;
-    chip.querySelector('.rc-roman').textContent = romanOfText(e.text, table);
-    chip.onclick = () => practiseText(e.text, e.text, false);
-    out.appendChild(chip);
-  }
-  $('recentRow').hidden = recent.length === 0;
-}
 
 function setupLists() {
-  document.querySelectorAll('.filters button').forEach((b) => {
+  document.querySelectorAll('.filters button[data-filter]').forEach((b) => {
     b.onclick = () => { state.historyFilter = b.dataset.filter; renderLists(); };
   });
+  // Removes the history entries listed (every page of them): in a hidden language they stay, so an entry practised in
+  // several languages loses only the ones shown.
   $('histClear').onclick = () => {
-    if (!confirm('Clear your practice history? Bookmarks and writing are kept.')) return;
-    store.del('history');
+    const h = historyAll();
+    const filter = state.historyFilter || 'all';
+    const off = hiddenHistoryLangs();
+    const shown = shownHistory(h, filter);
+    if (!shown.length) return toast('Nothing to clear');
+    const langs = Core.LANG_CODES.filter((l) => !off.includes(l) && shown.some((e) => historyLangs(e).includes(l)));
+    const what = filter === 'words' ? 'words' : filter === 'chars' ? 'characters' : 'words and characters';
+    const names = langs.map((l) => Core.LANGS[l].name).join(', ');
+    if (!confirm(`Remove ${shown.length} ${what} from your history (${names})? Bookmarks and writing are kept.`)) return;
+    for (const e of shown) {
+      const keep = historyLangs(e).filter((l) => off.includes(l));
+      if (keep.length) h[e.text].langs = keep;
+      else delete h[e.text];
+    }
+    store.set('history', h);
     renderLists();
   };
   if (Native && Native.backUp) {
@@ -856,9 +1016,15 @@ function setupLists() {
     $('backUpBtn').onclick = () => { saveInk(); Native.backUp(); };
     $('restoreBtn').onclick = () => Native.restore();
   }
-  if (Native && Native.settings) {
-    $('downloadsRow').hidden = false;
-    $('downloadsBtn').onclick = () => Native.settings();
+  // ⋮ on the home screen: Settings and About Hok6 (the app's own screens).
+  if (Native && Native.settings && Native.about) {
+    $('homeMoreBtn').hidden = false;
+    $('homeMoreBtn').onclick = (e) => { e.stopPropagation(); toggleMoreMenu('homeMenu', 'homeMoreBtn'); };
+    $('settingsBtn').onclick = () => { $('homeMenu').hidden = true; Native.settings(); };
+    $('aboutBtn').onclick = () => { $('homeMenu').hidden = true; Native.about(); };
+    $('aboutBtn2').onclick = () => Native.about();
+  } else {
+    $('aboutBtn2').hidden = true;
   }
   $('bmPractise').onclick = () => {
     const all = bookmarks().join('');
@@ -866,16 +1032,56 @@ function setupLists() {
   };
 }
 
+/** The languages ticked on the welcome screen or in Settings (Downloads.languages); the switch shows only for two. */
+function learnedLangs() {
+  storeCache.delete('langs');
+  const langs = store.get('langs', null);
+  return Array.isArray(langs) && langs.length ? langs : [state.lang];
+}
+
+/* The language switches (on the home screen, and a short one on the worksheet): one button per language ticked, in
+   Settings' order; full names for two, the languages' own names for more, so they fit. */
+function applyLangs() {
+  const langs = Core.LANG_CODES.filter((l) => learnedLangs().includes(l));
+  [['langSwitch', 'lang'], ['langSwitch2', 'lang2']].forEach(([id, name]) => {
+    const group = $(id);
+    group.hidden = langs.length < 2;
+    group.innerHTML = '';
+    for (const l of langs) {
+      const info = Core.LANGS[l];
+      const label = document.createElement('label');
+      label.innerHTML = `<input type="radio" name="${name}" value="${l}"><span></span>`;
+      label.querySelector('span').textContent = name === 'lang2' ? info.short : langs.length > 2 ? info.name.split(' ')[0] : info.name;
+      label.querySelector('input').checked = l === state.lang;
+      label.querySelector('input').addEventListener('change', (e) => { if (e.target.checked) setLang(l); });
+      group.appendChild(label);
+    }
+  });
+  if (langs.length && !langs.includes(state.lang)) setLang(langs[0]);
+}
+
+/* Switches to the language some text is written in (kana: Japanese, hangul: Korean) if it's one being learned. */
+function useScriptLang(text) {
+  const lang = Core.scriptLang(text);
+  if (lang && lang !== state.lang && learnedLangs().includes(lang)) setLang(lang);
+}
+
 function setLang(lang) {
   state.lang = lang;
   store.set('lang', lang);
   document.querySelectorAll('input[name=lang], input[name=lang2]').forEach((r) => { r.checked = r.value === lang; });
   document.querySelectorAll('.romanName').forEach((n) => { n.textContent = romanName(); });
+  document.querySelectorAll('.nameLabel').forEach((n) => { n.textContent = langInfo().nameLabel; });
+  $('fChars').placeholder = `e.g. ${langInfo().examples} — or type English: thank you, good morning`;
+  // The right glyph shapes for text drawn with the device's fonts (Japanese and Chinese forms differ).
+  document.documentElement.lang = langInfo().html;
   if ($('optSummary')) showOptSummary();
   if (Native && Native.setLanguage) Native.setLanguage(lang);
   if (!$('sheet').hidden && state.ws) renderPages();
   if (!$('practice').hidden) updatePracticeTitle();
   if (!$('home').hidden) renderTranslations();
+  // The pad starts again in the new language (and says if its handwriting needs downloading).
+  if (!$('drawArea').hidden) { $('hDownload').hidden = true; layoutHandPad(); requestAnimationFrame(recognizeHand); }
 }
 
 // ---------------------------------------------------------------- practice panel (Hanzi Writer)
@@ -892,7 +1098,7 @@ function status(msg) {
 
 async function updatePracticeTitle() {
   const ch = state.ws.chars[pIndex];
-  const table = await loadReadings(ch + (wordOf(ch) || ''));
+  const [table] = await Promise.all([loadReadings(ch + (wordOf(ch) || '')), loadWordReadings([wordOf(ch) || ch])]);
   const r = readingsOf(ch, table);
   $('pChar').textContent = ch;
   $('pRoman').textContent = r.length ? r.join(' / ') + ' 🔊' : '🔊';
@@ -1177,7 +1383,7 @@ function showOptSummary() {
   const bits = [{ large: 'Large', medium: 'Medium', small: 'Small' }[o.size], { mi: '米', tian: '田', none: 'no guide lines' }[o.grid]];
   if (o.strokes) bits.push('stroke order');
   if (o.roman) bits.push(romanName());
-  if (o.name) bits.push('姓名');
+  if (o.name) bits.push(langInfo().nameLabel.replace(/[：:]$/, ''));
   $('optSummary').textContent = '— ' + bits.join(' · ');
 }
 
@@ -1197,12 +1403,13 @@ function setupHome() {
   setupOptions();
   $('newForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const words = Core.practiceWords($('fChars').value);
+    useScriptLang($('fChars').value);
+    const words = Core.practiceWords($('fChars').value, state.lang);
     const chars = [...new Set(words.join(''))];
     const err = $('formError');
     if (!words.length) {
       err.textContent = Core.englishPhrases($('fChars').value).length
-        ? 'Tap a Chinese word above to use it.' : 'Type at least one Chinese character or English word.';
+        ? 'Tap a word above to use it.' : 'Type at least one character, word or English word.';
       err.hidden = false;
       return;
     }
@@ -1229,7 +1436,8 @@ function createWorksheet(title, chars, words, opts) {
 
 /* Practise some text (from a chapter, History or Bookmarks) on a fresh worksheet. */
 async function practiseText(title, text, fromChapter) {
-  const words = Core.practiceWords(text);
+  useScriptLang(text);
+  const words = Core.practiceWords(text, state.lang);
   const chars = [...new Set(words.join(''))];
   if (!words.length) return;
   if (fromChapter) state.autoStarted = true;
@@ -1240,44 +1448,43 @@ async function practiseText(title, text, fromChapter) {
 
 // ---------------------------------------------------------------- English → Chinese
 
-const dictIndex = new Map();
-const dictChunks = new Map();
-let dictMeta = null;
+/* Dictionary files, loaded once each: dict/ (Chinese), dict-ja/ (Japanese) and dict-ko/ (Korean), all laid out
+   the same way (see tools/build_assets.py). */
+const dictFiles = new Map();
 
-function dictFile(name) {
-  return fetch('dict/' + name + '.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+function dictFile(name, lang = state.lang) {
+  const dir = { zh: 'dict/', ja: 'dict-ja/', ko: 'dict-ko/' }[(Core.LANGS[lang] || langInfo()).strokes];
+  const path = dir + name + '.json';
+  if (!dictFiles.has(path)) dictFiles.set(path, fetch(path).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  return dictFiles.get(path);
 }
 
-/* The best Chinese words for an English phrase, in the current language. */
-async function searchEnglish(phrase) {
+async function dictEntry(i, lang = state.lang) {
+  const meta = (await dictFile('meta', lang)) || { chunk: 1000 };
+  return ((await dictFile('e' + Math.floor(i / meta.chunk), lang)) || [])[i % meta.chunk];
+}
+
+/* The best words for an English phrase in a language (the current one unless given). */
+async function searchEnglish(phrase, lang = state.lang) {
   const tokens = Core.englishTokens(phrase);
   if (!tokens.length) return [];
-  if (!dictMeta) dictMeta = (await dictFile('meta')) || { chunk: 1000 };
-  const postings = await Promise.all(tokens.map(async (t) => {
-    if (!dictIndex.has(t[0])) dictIndex.set(t[0], dictFile('i' + t[0]));
-    const table = (await dictIndex.get(t[0])) || {};
-    return table[t] || [];
-  }));
+  const postings = await Promise.all(tokens.map(async (t) => ((await dictFile('i' + t[0], lang)) || {})[t] || []));
   // Start from the rarest word; every other word must also be in the entry. Postings are best-first already.
   postings.sort((a, b) => a.length - b.length);
   const others = postings.slice(1).map((p) => new Set(p));
   const candidates = postings[0].filter((i) => others.every((s) => s.has(i))).slice(0, 60);
-  const entries = await Promise.all(candidates.map(async (i) => {
-    const c = Math.floor(i / dictMeta.chunk);
-    if (!dictChunks.has(c)) dictChunks.set(c, dictFile('e' + c));
-    return { order: candidates.indexOf(i), entry: ((await dictChunks.get(c)) || [])[i % dictMeta.chunk] };
-  }));
+  const entries = await Promise.all(candidates.map(async (i, order) => ({ order, entry: await dictEntry(i, lang) })));
   const seen = new Set();
   // Simplified forms for the Mandarin favourites come from the dictionary entries already loaded, when found.
   const simp = new Map(entries.filter((x) => x.entry).map((x) => [x.entry[0], x.entry[1]]));
-  const favs = Core.favourites(phrase, state.lang, (w) => simp.get(w) || w);
+  const favs = Core.favourites(phrase, lang, (w) => simp.get(w) || w);
   return favs.concat(entries
-    .map((x) => Object.assign(x, { score: x.entry ? Core.matchScore(x.entry, phrase, state.lang) : null }))
+    .map((x) => Object.assign(x, { score: x.entry ? Core.matchScore(x.entry, phrase, lang) : null }))
     .filter((x) => x.score !== null)
     .sort((a, b) => a.score - b.score || a.order - b.order)
     .map((x) => x.entry))
     .filter((e) => {
-      const word = state.lang === 'yue' ? e[0] : e[1];
+      const word = Core.entryWord(e, lang);
       if (seen.has(word)) return false;
       seen.add(word);
       return true;
@@ -1285,28 +1492,82 @@ async function searchEnglish(phrase) {
     .slice(0, 8);
 }
 
+/* The languages English is looked up in: the current one, then any others switched on with their toggles (remembered;
+   off at first, so the list stays short). */
+function lookupLangs() {
+  const extra = store.get('trLangs', []);
+  return [state.lang].concat(Core.LANG_CODES.filter((l) => l !== state.lang && extra.includes(l)));
+}
+
+/* The toggles for the other languages, above the suggestions. */
+function renderLookupToggles() {
+  const row = $('trLangs');
+  row.innerHTML = '';
+  const extra = store.get('trLangs', []);
+  for (const l of Core.LANG_CODES.filter((x) => x !== state.lang)) {
+    const on = extra.includes(l);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = on ? 'sel' : '';
+    b.textContent = (on ? '✓ ' : '+ ') + Core.LANGS[l].name.split(' ')[0];
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', (on ? 'Stop looking up in ' : 'Also look up in ') + Core.LANGS[l].name);
+    b.onclick = () => {
+      store.set('trLangs', on ? extra.filter((x) => x !== l) : extra.concat(l));
+      renderTranslations();
+    };
+    row.appendChild(b);
+  }
+}
+
+/* A word's reading for its suggestion chip, in its language. */
+function chipReading(e, lang, table) {
+  if (lang === 'yue') return e[3] || romanOfText(e[0], table, lang);
+  if (lang === 'cmn') return e[2] ? Core.pinyinMarks(e[2]) : romanOfText(e[0], table, lang);
+  if (lang === 'ja') return (e[1] && e[1] !== e[0] ? e[1] + ' · ' : '') + Core.kanaToRomaji(e[1] || e[0]);
+  return Core.romanizeHangul(e[0]);
+}
+
+/* Practises a word suggested in another language: switches to it (adding it to the languages learned if needed). */
+function useLang(lang) {
+  if (lang === state.lang) return;
+  const learned = learnedLangs();
+  if (!learned.includes(lang)) {
+    store.set('langs', Core.LANG_CODES.filter((l) => l === lang || learned.includes(l)));
+    toast(`Added ${Core.LANGS[lang].name} to your languages`);
+  }
+  setLang(lang);
+  applyLangs();
+}
+
 let translateTimer = 0;
 let translateRun = 0;
 
-/* Shows Chinese words for any English typed in the practice box. Tapping one replaces the English with it. */
+/* Shows words for any English typed in the practice box, in every language (the current one first, then a row for
+   each of the others). Tapping one replaces the English with it, switching to its language. */
 function renderTranslations() {
   clearTimeout(translateTimer);
   translateTimer = setTimeout(async () => {
     const run = ++translateRun;
     const phrases = Core.englishPhrases($('fChars').value);
-    $('trLang').textContent = state.lang === 'yue' ? '廣東話 Cantonese' : '普通話 Mandarin';
+    const langs = lookupLangs();
+    $('trLang').textContent = langs.length > 1 ? langs.map((l) => Core.LANGS[l].name.split(' ')[0]).join(' · ') : langInfo().name;
+    renderLookupToggles();
     $('trHint').hidden = phrases.length > 0;
     if (!phrases.length) { $('trResults').innerHTML = ''; return; }
-    const results = await Promise.all(phrases.map(searchEnglish));
+    // results[phrase][language]: the current language gets up to 8 words, the others 4 each; with only the current
+    // language, its words have no language label.
+    const results = await Promise.all(phrases.map((p) => Promise.all(langs.map(async (l, k) =>
+      (await searchEnglish(p, l)).slice(0, k === 0 ? 8 : 4)))));
     if (run !== translateRun) return;
-    const table = await loadReadings(results.flat().map((e) => e[0] + e[1]).join(''));
-    if (state.lang === 'cmn') {
-      // Favourites carry traditional characters; use the dictionary's simplified form when it has one.
-      await Promise.all(results.flat().filter((e) => !e[2]).map(async (e) => {
-        const hit = (await searchEnglish(e[4])).find((x) => x[0] === e[0] && x[2]);
-        if (hit) { e[1] = hit[1]; e[2] = hit[2]; }
-      }));
-    }
+    const all = results.flat(2);
+    const table = await loadReadings(all.map((e) => e[0] + e[1]).join(''));
+    const cmn = langs.indexOf('cmn');
+    // Mandarin favourites carry traditional characters; use the dictionary's simplified form when it has one.
+    await Promise.all((cmn < 0 ? [] : results.map((r) => r[cmn]).flat()).filter((e) => !e[2]).map(async (e) => {
+      const hit = (await searchEnglish(e[4], 'cmn')).find((x) => x[0] === e[0] && x[2]);
+      if (hit) { e[1] = hit[1]; e[2] = hit[2]; }
+    }));
     const out = $('trResults');
     out.innerHTML = '';
     phrases.forEach((phrase, i) => {
@@ -1316,33 +1577,46 @@ function renderTranslations() {
       label.className = 'tr-phrase';
       label.textContent = `“${phrase}”`;
       row.appendChild(label);
-      if (!results[i].length) {
+      if (!results[i].some((r) => r.length)) {
         const none = document.createElement('span');
         none.className = 'muted';
         none.textContent = 'no match — try another word';
         row.appendChild(none);
       }
-      for (const e of results[i]) {
-        const word = state.lang === 'yue' ? e[0] : e[1];
-        const roman = state.lang === 'yue'
-          ? (e[3] || romanOfText(e[0], table))
-          : (e[2] ? Core.pinyinMarks(e[2]) : romanOfText(e[0], table));
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'tr-chip';
-        chip.innerHTML = '<span class="tr-word"></span><span class="tr-roman"></span><span class="tr-gloss"></span>';
-        chip.querySelector('.tr-word').textContent = word + (state.lang === 'cmn' && e[0] !== e[1] ? ` (${e[0]})` : '');
-        chip.querySelector('.tr-roman').textContent = roman;
-        chip.querySelector('.tr-gloss').textContent = e[4];
-        chip.onclick = () => {
-          const field = $('fChars');
-          const rx = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'i');
-          field.value = rx.test(field.value) ? field.value.replace(rx, ' ' + word + ' ') : field.value + ' ' + word;
-          field.value = field.value.replace(/\s+/g, ' ').replace(/^ | $/g, '').replace(/ ?[,，] ?/g, ' ');
-          renderTranslations();
-        };
-        row.appendChild(chip);
-      }
+      langs.forEach((lang, k) => {
+        if (!results[i][k].length) return;
+        const group = document.createElement('div');
+        group.className = 'tr-lang' + (k === 0 ? ' current' : '');
+        if (langs.length > 1) {
+          const name = document.createElement('span');
+          name.className = 'tr-lang-name';
+          name.textContent = Core.LANGS[lang].name.split(' ')[0];
+          group.appendChild(name);
+        }
+        for (const e of results[i][k]) {
+          const word = Core.entryWord(e, lang);
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'tr-chip';
+          chip.lang = Core.LANGS[lang].html;
+          chip.innerHTML = '<span class="tr-word"></span><span class="tr-roman"></span><span class="tr-gloss"></span>';
+          // Mandarin: the traditional form too; Korean: the hanja.
+          const alt = lang === 'cmn' && e[0] !== e[1] ? e[0] : lang === 'ko' ? e[1] : '';
+          chip.querySelector('.tr-word').textContent = word + (alt ? ` (${alt})` : '');
+          chip.querySelector('.tr-roman').textContent = chipReading(e, lang, table);
+          chip.querySelector('.tr-gloss').textContent = e[4];
+          chip.onclick = () => {
+            const field = $('fChars');
+            const rx = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'), 'i');
+            field.value = rx.test(field.value) ? field.value.replace(rx, ' ' + word + ' ') : field.value + ' ' + word;
+            field.value = field.value.replace(/\s+/g, ' ').replace(/^ | $/g, '').replace(/ ?[,，] ?/g, ' ');
+            useLang(lang);
+            renderTranslations();
+          };
+          group.appendChild(chip);
+        }
+        row.appendChild(group);
+      });
       out.appendChild(row);
     });
   }, 300);
@@ -1359,6 +1633,16 @@ function quizItems() {
   return store.get('quiz', []);
 }
 
+/* Adds a word or character to the quiz, or takes it out if it's there (📝 in History and Bookmarks). */
+function toggleQuizItem(t) {
+  const items = quizItems();
+  const on = !items.includes(t);
+  store.set('quiz', on ? items.concat(t) : items.filter((x) => x !== t));
+  toast(on ? `📝 Added ${t} to the quiz` : `Took ${t} out of the quiz`);
+  renderQuizCard();
+  renderLists();
+}
+
 function renderQuizCard() {
   const items = quizItems();
   const out = $('quizItems');
@@ -1370,7 +1654,7 @@ function renderQuizCard() {
     chip.querySelector('.q-word').textContent = t;
     const [say, remove] = chip.querySelectorAll('button');
     say.onclick = () => speak(t);
-    remove.onclick = () => { store.set('quiz', quizItems().filter((x) => x !== t)); renderQuizCard(); };
+    remove.onclick = () => { store.set('quiz', quizItems().filter((x) => x !== t)); renderQuizCard(); renderLists(); };
     out.appendChild(chip);
   }
   // Until something is added, a one-line tip says how, instead of the whole card.
@@ -1411,6 +1695,7 @@ function setupQuiz() {
     if (!confirm('Remove everything from the quiz?')) return;
     store.set('quiz', []);
     renderQuizCard();
+    renderLists();
   };
   $('qBack').onclick = closeQuiz;
   renderQuizCard();
@@ -1484,7 +1769,7 @@ function soundButtons(item, auto) {
 
 /* The answer side of a card: the word, how it's said, and what it means, leaving out what the prompt already showed. */
 async function answerFor(item, prompt) {
-  const table = await loadReadings(item);
+  const [table] = await Promise.all([loadReadings(item), loadWordReadings([item])]);
   const box = document.createElement('div');
   if (prompt !== 'zh') box.append(bigText(item));
   box.append(bigText(romanOfText(item, table), 'q-roman'));
@@ -1548,9 +1833,9 @@ async function startWriting(item, run) {
   const count = chars.length > 1 ? ` (${chars.length} characters)` : '';
   if (quiz.opt === 'en') {
     prompt.append(bigText(await meaningOf(item) || '(no English meaning found)', 'q-meaning'));
-    $('qStatus').textContent = 'Write it in Chinese' + count;
+    $('qStatus').textContent = 'Write it' + count;
   } else if (quiz.opt === 'sound') {
-    const table = await loadReadings(item);
+    const [table] = await Promise.all([loadReadings(item), loadWordReadings([item])]);
     prompt.append(soundButtons(item, true), bigText(romanOfText(item, table), 'q-roman'));
     $('qStatus').textContent = 'Write what you hear' + count;
   } else {
@@ -1686,22 +1971,14 @@ function showQuizSummary() {
   out.hidden = false;
 }
 
-// ---------------------------------------------------------------- Chinese → English (quiz meanings)
+// ---------------------------------------------------------------- word → English (quiz meanings)
 
-const wordIndex = new Map();
-
-/* Dictionary entries whose headword (traditional or simplified) is this word. */
-async function dictEntriesFor(word) {
-  if (!dictMeta) dictMeta = (await dictFile('meta')) || { chunk: 1000 };
+/* Dictionary entries whose headword (traditional or simplified; Japanese kanji or kana; Korean hangul or hanja) is
+   this word. */
+async function dictEntriesFor(word, lang = state.lang) {
   const shard = (word.codePointAt(0) >> Core.SHARD_BITS).toString(16);
-  if (!wordIndex.has(shard)) wordIndex.set(shard, dictFile('c' + shard));
-  const ids = ((await wordIndex.get(shard)) || {})[word] || [];
-  const entries = await Promise.all(ids.map(async (i) => {
-    const c = Math.floor(i / dictMeta.chunk);
-    if (!dictChunks.has(c)) dictChunks.set(c, dictFile('e' + c));
-    return ((await dictChunks.get(c)) || [])[i % dictMeta.chunk];
-  }));
-  return entries.filter(Boolean);
+  const ids = ((await dictFile('c' + shard, lang)) || {})[word] || [];
+  return (await Promise.all(ids.map((i) => dictEntry(i, lang)))).filter(Boolean);
 }
 
 /* A short English meaning for a character or word, e.g. 華 → "flower; magnificent; splendid". */
@@ -1749,7 +2026,7 @@ function setupHandPad() {
     hand.current.push(Math.round(e.clientX - r.left), Math.round(e.clientY - r.top), Math.round(e.timeStamp - hand.t0));
   };
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'pen' && state.fingerDraw) setFingerDraw(false, false);
+    if (e.pointerType === 'pen') stylusTouched();
     // A hand resting on the screen while writing with a stylus; "Let fingers write" (hFinger) turns this off.
     if (e.pointerType === 'touch' && !state.fingerDraw) return;
     canvas.setPointerCapture(e.pointerId);
@@ -1774,6 +2051,11 @@ function setupHandPad() {
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
   $('hClear').onclick = clearHand;
+  $('hDownload').onclick = downloadHandwriting;
+  document.querySelectorAll('#hCells button').forEach((b) => {
+    b.onclick = () => { store.set('handCells', Number(b.dataset.cells)); layoutHandPad(); };
+  });
+  window.addEventListener('resize', () => { if (!$('drawArea').hidden) layoutHandPad(); });
   $('hSpace').onclick = () => addToBox(' ');
   $('hDel').onclick = () => {
     const f = $('fChars');
@@ -1782,26 +2064,19 @@ function setupHandPad() {
   };
   $('hFinger').onclick = () => setFingerDraw(true, true);
   $('hFinger').hidden = state.fingerDraw;
-  if (store.get('inputMode', 'type') === 'draw') {
-    document.querySelector('input[name=inputMode][value=draw]').checked = true;
-    setInputMode('draw');
-  }
 }
 
-/* What to practice is typed (characters, or English to look up) or drawn on the pad and recognised. */
+/* What to practice is typed (characters, or English to look up) or drawn on the pad and recognised. Writing practice
+   always opens on ⌨ Type. */
 function setInputMode(mode) {
-  store.set('inputMode', mode);
   const draw = mode === 'draw';
   $('typeArea').hidden = draw;
   $('drawArea').hidden = !draw;
   if (!draw) { clearTimeout(hand.timer); return; }
-  clearHand();
+  layoutHandPad();
   handBoxChanged();
-  // Starts the one-time model download now, rather than after the first character is written.
-  requestAnimationFrame(() => {
-    const r = $('hCanvas').getBoundingClientRect();
-    if (r.width) Native.recognizeInk(++hand.request, state.lang, '[]', r.width, r.height);
-  });
+  // Checks straight away whether this language's recognition is on the device (offering the download if not).
+  requestAnimationFrame(recognizeHand);
 }
 
 function clearHand() {
@@ -1810,7 +2085,41 @@ function clearHand() {
   hand.current = null;
   hand.request++;
   $('hCands').textContent = '';
+  if (!$('hDownload').hidden) return drawHand(); // keep saying what to download
+  $('hStatus').textContent = padHint();
   drawHand();
+}
+
+/* The pad: 1 to 4 squares in a row (remembered), each with its 米 guide, so a whole word can be written at once, one
+   character per square. Changing the number of squares starts again. */
+function layoutHandPad() {
+  const n = [1, 2, 3, 4].includes(store.get('handCells', 2)) ? store.get('handCells', 2) : 2;
+  document.querySelectorAll('#hCells button').forEach((b) => b.classList.toggle('sel', Number(b.dataset.cells) === n));
+  const side = window.innerWidth > window.innerHeight && window.innerHeight < 700;
+  const room = side ? window.innerWidth * 0.45 : Math.min(window.innerWidth - 48, 900);
+  const cell = Math.floor(Math.max(90, Math.min(room / n, window.innerHeight * 0.42, n === 1 ? 420 : 300)));
+  const wrap = document.querySelector('.hand-wrap');
+  wrap.style.width = cell * n + 'px';
+  wrap.style.height = cell + 'px';
+  const g = $('hGrid');
+  g.setAttribute('viewBox', `0 0 ${100 * n} 100`);
+  g.innerHTML = '';
+  const guide = { stroke: '#D8D8D8', 'stroke-width': 0.5, 'stroke-dasharray': '2 2' };
+  for (let k = 0; k < n; k++) {
+    const x = 100 * k;
+    line(g, x, 0, x + 100, 100, guide);
+    line(g, x + 100, 0, x, 100, guide);
+    line(g, x + 50, 0, x + 50, 100, guide);
+    line(g, x, 50, x + 100, 50, guide);
+    if (k) line(g, x, 0, x, 100, { stroke: '#BDBDBD', 'stroke-width': 0.8 });
+  }
+  $('hStatus').textContent = padHint();
+  clearHand();
+}
+
+function padHint() {
+  return store.get('handCells', 2) === 1 ? 'Write a character in the square, then tap the right one below.'
+    : 'Write a word, one character per square, then tap the right one below.';
 }
 
 function drawHand() {
@@ -1825,7 +2134,7 @@ function drawHand() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, r.width, r.height);
   g.strokeStyle = '#212121';
-  g.lineWidth = Math.max(4, r.width / 60);
+  g.lineWidth = Math.max(4, r.height / 60);
   g.lineCap = 'round';
   g.lineJoin = 'round';
   for (const s of hand.strokes) {
@@ -1838,30 +2147,51 @@ function drawHand() {
 }
 
 function recognizeHand() {
-  if (!hand.strokes.length) return;
   const r = $('hCanvas').getBoundingClientRect();
+  if (!r.width) return;
   Native.recognizeInk(++hand.request, state.lang, JSON.stringify(hand.strokes), r.width, r.height);
 }
+
+/* ⬇ Download handwriting: gets this language's recognition (a one-time download); handReady() says when it's done. */
+function downloadHandwriting() {
+  if (!Native || !Native.downloadHandwriting) return;
+  $('hDownload').hidden = true;
+  $('hStatus').textContent = `Downloading ${langInfo().name} handwriting recognition (one time)…`;
+  Native.downloadHandwriting(state.lang);
+}
+
+window.handReady = function handReady(lang, ok) {
+  if (lang !== state.lang || $('drawArea').hidden) return;
+  if (ok) {
+    recognizeHand();
+  } else {
+    $('hStatus').textContent = 'The download didn\'t finish. Check the internet connection (Wi-Fi recommended) and try again.';
+    $('hDownload').hidden = false;
+  }
+};
 
 window.inkResult = function inkResult(id, result) {
   if (id !== hand.request || $('drawArea').hidden) return;
   const status = $('hStatus');
+  $('hDownload').hidden = !(result.missing || result.error);
   if (result.downloading) {
-    status.textContent = 'Getting handwriting recognition ready (a one-time download)…';
+    status.textContent = `Downloading ${langInfo().name} handwriting recognition (one time)…`;
     return;
   }
   if (result.missing) {
-    status.textContent = 'Handwriting recognition needs a one-time download: Settings (⋮ on the main screen) → Download all, with Wi-Fi on.';
+    status.textContent = `Writing by hand needs ${langInfo().name} handwriting recognition: a one-time download (Wi-Fi recommended), then it works offline.`;
     return;
   }
   if (result.error) {
-    status.textContent = 'Handwriting recognition isn\'t ready: check Wi-Fi, then Settings (⋮ on the main screen) → Download all. (' + result.error + ')';
+    status.textContent = 'Handwriting recognition isn\'t ready: check the internet connection and try again. (' + result.error + ')';
     return;
   }
-  status.textContent = hand.strokes.length ? 'Tap the right character:' : 'Write a character in the square, then tap the right one below.';
+  status.textContent = hand.strokes.length ? 'Tap the right one:' : padHint();
   const out = $('hCands');
   out.textContent = '';
-  for (const c of result.candidates.filter((t) => Array.from(t).some(isHan)).slice(0, 8)) {
+  // A word comes back with spaces between its characters sometimes; they aren't part of it.
+  const words = result.candidates.map((t) => t.replace(/\s+/g, '')).filter((t) => t && Array.from(t).every(isHan));
+  for (const c of [...new Set(words)].slice(0, 8)) {
     const b = document.createElement('button');
     b.textContent = c;
     b.onclick = () => { addToBox(c); clearHand(); };
@@ -1930,10 +2260,10 @@ function updateTools() {
 }
 
 /* ⋮ opens the less-used tools under it, at the right; zooming leaves it open (to zoom again), the rest close it. */
-function toggleMoreMenu() {
-  const menu = $('moreMenu');
+function toggleMoreMenu(menuId = 'moreMenu', buttonId = 'moreBtn') {
+  const menu = $(menuId);
   if (!menu.hidden) { menu.hidden = true; return; }
-  const r = $('moreBtn').getBoundingClientRect();
+  const r = $(buttonId).getBoundingClientRect();
   menu.style.top = (r.bottom + 6) + 'px';
   menu.style.right = Math.max(8, innerWidth - r.right) + 'px';
   menu.hidden = false;
@@ -1967,6 +2297,7 @@ function setupSheet() {
     if (!$('colorTray').hidden && !e.target.closest('#colorTray, #penBtn')) $('colorTray').hidden = true;
     if (!$('sizeTray').hidden && !e.target.closest('#sizeTray, #sizeBtn')) $('sizeTray').hidden = true;
     if (!$('moreMenu').hidden && !e.target.closest('#moreMenu, #moreBtn')) $('moreMenu').hidden = true;
+    if (!$('homeMenu').hidden && !e.target.closest('#homeMenu, #homeMoreBtn')) $('homeMenu').hidden = true;
   }, true);
   $('moreBtn').onclick = (e) => { e.stopPropagation(); toggleMoreMenu(); };
   $('moreMenu').addEventListener('click', (e) => {
@@ -1976,6 +2307,7 @@ function setupSheet() {
   $('eraserBtn').onclick = () => { state.tool = state.tool === 'eraser' ? 'pen' : 'eraser'; updateTools(); };
   $('clearBtn').onclick = clearScreen;
   $('fingerBtn').onclick = () => setFingerDraw(!state.fingerDraw, true);
+  $('modeBtn').onclick = () => setFingerDraw(!state.fingerDraw, true);
   $('zoomIn').onclick = () => setZoom(state.zoom * 1.25);
   $('zoomOut').onclick = () => setZoom(state.zoom / 1.25);
   setFingerDraw(state.fingerDraw, false);
@@ -1986,6 +2318,7 @@ function setupSheet() {
 // Android back button: returns true when handled here.
 window.handleBack = function handleBack() {
   if (!$('moreMenu').hidden) { $('moreMenu').hidden = true; return true; }
+  if (!$('homeMenu').hidden) { $('homeMenu').hidden = true; return true; }
   if (!$('colorTray').hidden) { $('colorTray').hidden = true; return true; }
   if (!$('sizeTray').hidden) { $('sizeTray').hidden = true; return true; }
   if (!$('practice').hidden) { closePractice(); return true; }
@@ -2010,10 +2343,15 @@ window.addEventListener('resize', () => {
 });
 
 window.addEventListener('pagehide', saveInk);
-document.addEventListener('visibilitychange', () => { if (document.hidden) saveInk(); });
-
-document.querySelectorAll('input[name=lang], input[name=lang2]').forEach((r) => {
-  r.addEventListener('change', () => { if (r.checked) setLang(r.value); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { saveInk(); return; }
+  applyLangs(); // back from Settings, where the languages may have changed
+  // Words may have been added to the quiz on a homework page meanwhile.
+  storeCache.delete('quiz');
+  renderQuizCard();
+  renderLists();
+  // Stylus or finger may have been switched on a book page meanwhile.
+  if (Native && Native.fingersDraw && Native.fingersDraw() !== state.fingerDraw) setFingerDraw(Native.fingersDraw(), false);
 });
 
 setupHome();
@@ -2029,6 +2367,7 @@ setupLists();
 renderLists();
 migrateSavedWorksheets();
 setLang(state.lang);
+applyLangs();
 renderLists();
 $('fChars').addEventListener('input', renderTranslations);
 

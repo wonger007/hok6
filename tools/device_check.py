@@ -15,8 +15,10 @@ copies the book in test/ to Download/StudyBookCheck on the device, and then chec
   7. Export → Share PDF opens Android's share menu with a US Letter PDF drawn as lines and text (not a picture)
   8. writing on a worksheet is kept in app storage when the word is practiced again; Clear erases it and Undo restores it
   9. a stylus stroke on a worksheet is drawn (not taken as scrolling)
- 10. typing English ("thank you") suggests Chinese words
- 11. pinching while dragging a PDF (zooming while scrolling) doesn't stretch its pages, so tracing stays on the page
+ 10. typing English ("thank you") suggests Cantonese words
+ 11. Japanese and Korean too: their stroke data (学 8 strokes, あ 3; hangul 한 6, hanja 學) and "thank you" suggesting
+     ありがとう and 감사합니다 (whenever Chinese is checked, Japanese and Korean are as well)
+ 12. pinching while dragging a PDF (zooming while scrolling) doesn't stretch its pages, so tracing stays on the page
 
 Screenshots and a summary go to build/device-check/. Exit code 0 means every check passed.
 
@@ -140,13 +142,10 @@ def devtools_eval(device, expression, timeout=30):
     device.run("forward", f"tcp:{DEVTOOLS_PORT}", f"localabstract:webview_devtools_remote_{pid}")
     try:
         pages = json.load(urllib.request.urlopen(f"http://127.0.0.1:{DEVTOOLS_PORT}/json", timeout=10))
-    except OSError as e:
+    except OSError:
         if device.adb[0] == WINDOWS_ADB:
-            # Not a failed check: the rest can't run this way, so stop with what to do (checks retry other errors).
-            raise SystemExit("\nstopping: the writing-practice checks look inside the app through a port that Windows' "
-                             "adb opens on Windows only. Set networkingMode=mirrored under [wsl2] in "
-                             "%USERPROFILE%\\.wslconfig and run `wsl --shutdown` (then WSL sees it), or attach the device "
-                             "with usbipd instead.") from e
+            # The forwarded port is on Windows' 127.0.0.1, out of WSL's reach: ask from the Windows side instead.
+            return devtools_eval_windows(expression, timeout)
         raise
     page = next(p for p in pages if p.get("type") == "page")
     url = page["webSocketDebuggerUrl"]
@@ -197,6 +196,25 @@ def devtools_eval(device, expression, timeout=30):
                 if "exceptionDetails" in result:
                     raise Failed("page error: " + json.dumps(result["exceptionDetails"])[:300])
                 return result["result"].get("value")
+
+
+def devtools_eval_windows(expression, timeout):
+    """devtools_eval through tools/devtools_eval.ps1 (PowerShell on Windows), for a device on Windows' adb."""
+    work = os.path.join(ROOT, "build", "device-check")
+    os.makedirs(work, exist_ok=True)
+    path = os.path.join(work, "expression.js")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(expression)
+    win = lambda p: subprocess.run(["wslpath", "-w", p], capture_output=True, text=True, check=True).stdout.strip()
+    out = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                          win(os.path.join(ROOT, "tools", "devtools_eval.ps1")), str(DEVTOOLS_PORT), win(path),
+                          str(timeout)], capture_output=True, timeout=timeout + 30)
+    if out.returncode != 0:
+        raise Failed("DevTools (Windows): " + out.stderr.decode("utf-8", "replace").strip()[:300])
+    result = json.loads(out.stdout.decode("utf-8"))["result"]
+    if "exceptionDetails" in result:
+        raise Failed("page error: " + json.dumps(result["exceptionDetails"])[:300])
+    return result["result"].get("value")
 
 
 # ---- the checks
@@ -505,7 +523,7 @@ def main():
             raise Failed("tapping the page title in Practice Selector mode didn't open the character list")
         chips = [n for n in device.nodes() if len(n[0]) == 1 and re.match(r"[㐀-鿿\U00020000-\U0003ffff]", n[0])]
         if not chips:
-            raise Failed("no Chinese characters listed for the page")
+            raise Failed("no characters listed for the page")
         # The character tapped on the page is already chosen.
         xml = device.shell("cat /sdcard/sbcheck-ui.xml", check=False)
         ticked = [n.get("text") for n in ET.fromstring(xml).iter("node")
@@ -821,10 +839,45 @@ def main():
                                       " f.dispatchEvent(new Event('input')); await new Promise(r=>setTimeout(r,4000));"
                                       " return [...document.querySelectorAll('#trResults .tr-word')].map(n=>n.textContent) })()", timeout=60)
         if not value:
-            raise Failed("no Chinese suggestions for “thank you”")
+            raise Failed("no Cantonese suggestions for “thank you”")
         if value[0] != "多謝" or "謝謝" not in value:
             raise Failed(f"unexpected suggestions for “thank you”: {value}")
         return "“thank you” → " + " ".join(value[:4])
+
+    def japanese_and_korean():
+        # Learns all four for the check, then puts the test app's languages back.
+        value = devtools_eval(device, """(async()=>{
+            const before = {langs: store.get('langs', null), lang: state.lang};
+            store.set('langs', ['yue', 'cmn', 'ja', 'ko']);
+            const out = {};
+            const word = async (phrase) => { const f = document.getElementById('fChars'); f.value = phrase;
+              f.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 4000));
+              return [...document.querySelectorAll('#trResults .tr-word')].map(n => n.textContent); };
+            try {
+              for (const [lang, chars] of [['ja', ['学', 'あ']], ['ko', ['한', '學']]]) {
+                setLang(lang);
+                out[lang] = {strokes: {}, words: await word('thank you')};
+                for (const c of chars) { const d = await loadChar(c); out[lang].strokes[c] = d ? d.strokes.length : 0; }
+              }
+            } finally {
+              document.getElementById('fChars').value = '';
+              if (before.langs) store.set('langs', before.langs); else store.del('langs');
+              setLang(before.lang);
+              applyLangs();
+            }
+            return out; })()""", timeout=120)
+        ja, ko = value["ja"], value["ko"]
+        expected = {"学": 8, "あ": 3, "한": 6}
+        for lang in (ja, ko):
+            for ch, n in lang["strokes"].items():
+                if n <= 0 or (ch in expected and n != expected[ch]):
+                    raise Failed(f"stroke data for {ch}: {n} strokes (expected {expected.get(ch, 'some')})")
+        if not ja["words"] or ja["words"][0] != "ありがとう":
+            raise Failed(f"Japanese suggestions for “thank you”: {ja['words']}")
+        if not ko["words"] or "감사합니다" not in ko["words"][:2]:
+            raise Failed(f"Korean suggestions for “thank you”: {ko['words']}")
+        strokes = ", ".join(f"{c} {n}" for lang in (ja, ko) for c, n in lang["strokes"].items())
+        return f"strokes: {strokes}; “thank you” → {ja['words'][0]}, {ko['words'][0]}"
 
     ok = (check("Chapters are listed in order", results, device, chapters_in_order)
           and check("A chapter lists its files", results, device, chapter_lists_files)
@@ -836,6 +889,7 @@ def main():
           and check("Writing is kept; Clear erases it", results, device, writing_kept_and_cleared)
           and check("A stylus writes on the worksheet", results, device, stylus_writes)
           and check("English is looked up", results, device, english_lookup)
+          and check("Japanese and Korean work too", results, device, japanese_and_korean)
           and check("Zooming while scrolling keeps pages in shape", results, device, zoom_keeps_page_shape)
           and check("Tap the page number to go to a page", results, device, go_to_page)
           and check("Tracing on a PDF page is saved", results, device, tracing_kept)

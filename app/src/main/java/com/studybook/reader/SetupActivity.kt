@@ -12,7 +12,7 @@ import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 /**
- * The welcome screen on first start: Hok6's name and tag line, what it needs from the internet, a button to get all
+ * The welcome screen on first start: Hok6's name and tag line, the language to learn, what it needs from the internet, a button to get all
  * of it, and Skip. Either way it isn't shown again (Settings can show it again); what's skipped is offered later,
  * when a feature needs it (see [Downloads.ask]).
  */
@@ -51,6 +51,7 @@ class SetupActivity : AppCompatActivity() {
                 else -> R.string.download_all
             })
         }
+        bindLanguageChoice(findViewById(R.id.language_choice)) { list.check() }
         download.setOnClickListener { if (list.allReady) finishSetup() else list.downloadAll() }
         skip.setOnClickListener { finishSetup() }
         Voices.noticeSwitch(this) { list.check() }
@@ -66,7 +67,7 @@ class SetupActivity : AppCompatActivity() {
     }
 }
 
-/** Settings: downloads (any time), download reminders, light or dark, and the welcome screen again. */
+/** Settings: the language, downloads (any time), download reminders, light or dark, and the welcome screen again. */
 class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +89,7 @@ class SettingsActivity : AppCompatActivity() {
             })
         }
         download.setOnClickListener { list.downloadAll() }
+        bindLanguageChoice(findViewById(R.id.language_choice)) { list.check() }
 
         // Voices: Google's engine (when installed) or the tablet's own; the list above re-checks after a change.
         val engines = findViewById<android.widget.RadioGroup>(R.id.settings_voice_engine)

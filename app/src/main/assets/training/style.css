@@ -85,6 +85,10 @@ button:disabled { opacity: 0.4; }
 }
 .bar button.tbtn.sel { background: rgba(255,255,255,0.3); border: 2.5px solid #fff; }
 .bar button.tbtn.clear-btn { font-size: 15px; font-weight: 600; padding: 0 12px; }
+/* The stylus / finger toggle: in the title bar on tablets, under ⋮ on phones (whichever applies, when shown). */
+#modeBtn[hidden], #fingerBtn[hidden] { display: none !important; }
+@media (max-width: 599px) { #modeBtn { display: none !important; } }
+@media (min-width: 600px) { #fingerBtn { display: none !important; } }
 .bar button.pen-btn i { display: inline-block; border-radius: 50%; border: 2px solid #fff; vertical-align: middle; }
 .color-tray {
   position: fixed; z-index: 15; display: flex; gap: 8px; padding: 8px;
@@ -98,6 +102,7 @@ button:disabled { opacity: 0.4; }
 button.pen { border: none; background: transparent; min-width: 44px; padding: 0; }
 button.pen i { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; vertical-align: middle; }
 
+.lang[hidden] { display: none; }
 .lang { display: flex; background: rgba(255,255,255,0.14); border-radius: 999px; padding: 3px; }
 .lang label { cursor: pointer; }
 .lang input { display: none; }
@@ -162,12 +167,6 @@ svg.page .ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; 
 /* English → Chinese suggestions */
 .translate { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: -6px 0 16px; background: rgba(198, 40, 40, 0.04); }
 .translate-head { font-size: 14px; margin-bottom: 6px; }
-.recent { margin: -6px 0 12px; }
-.recent > .muted { font-size: 14px; }
-.recent-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-button.recent-chip { display: flex; flex-direction: column; align-items: flex-start; min-height: 0; padding: 4px 12px; border-radius: 12px; }
-.rc-word { font-size: 20px; font-family: "Noto Serif CJK HK", serif; }
-.rc-roman { font-size: 12px; color: var(--red-text); }
 details.options { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
 details.options summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 details.options summary .muted { font-weight: normal; font-size: 14px; }
@@ -178,6 +177,12 @@ details.options[open] summary { margin-bottom: 10px; }
 .tr-tap { font-weight: normal; color: var(--muted); }
 .tr-box #trHint { margin: 0; font-size: 14px; }
 .tr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
+/* One line per language under each English phrase: its name, then its words (the current language first). */
+.tr-lang { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+.tr-lang-name { min-width: 4.5em; font-size: 14px; font-weight: 600; opacity: 0.7; }
+.tr-lang.current .tr-lang-name { opacity: 1; color: var(--brand); }
+.tr-langs { margin: 4px 0 6px; }
+.tr-langs button { min-height: 30px; padding: 2px 12px; font-size: 13px; }
 .tr-phrase { width: 100%; font-weight: 600; font-size: 14px; }
 .tr-chip { display: flex; flex-direction: column; align-items: flex-start; text-align: left; border-radius: 12px; padding: 6px 12px; min-height: 0; max-width: 220px; }
 .tr-word { font-size: 24px; font-family: "Noto Serif CJK HK", serif; }
@@ -193,12 +198,16 @@ button.small { min-height: 36px; padding: 6px 14px; font-size: 14px; }
 .filters { display: flex; gap: 6px; margin-bottom: 8px; }
 .filters button { min-height: 34px; padding: 4px 14px; font-size: 14px; }
 .filters button.sel { background: var(--brand); border-color: var(--brand); color: #fff; }
+.lang-filters { flex-wrap: wrap; }
 .items { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; }
 .items li { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
 .item-main { flex: 1; display: flex; flex-direction: column; align-items: flex-start; text-align: left; border: none; border-radius: 10px; background: transparent; padding: 8px; min-width: 0; }
 .item-text { font-size: 26px; font-family: "Noto Serif CJK HK", serif; }
 .item-sub { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 button.star { color: var(--star); font-size: 26px; }
+/* 📝 on a history row: faint until the word is in the quiz. */
+button.icon.quiz-add { opacity: 0.45; }
+button.icon.quiz-add.sel { opacity: 1; background: var(--sel); border-radius: 50%; }
 .pron { display: flex; flex-direction: column; align-items: flex-start; }
 .pron-row { display: flex; align-items: center; }
 .tone { color: var(--muted); font-size: 14px; padding-left: 14px; }
@@ -248,7 +257,7 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
 @media (min-width: 600px) and (min-height: 600px) {
   body { font-size: 17px; }
   .bar h1, .card h2 { font-size: 22px; }
-  .credits, .hint, .item-sub, .translate-head, .tr-box #trHint, .backup-row .muted, .recent > .muted,
+  .credits, .hint, .item-sub, .translate-head, .tr-box #trHint, .backup-row .muted,
   button.small, .filters button, .quiz-tip { font-size: 15px; }
   .status { font-size: 17px; }
   .field input[type=text] { font-size: 19px; }
@@ -256,7 +265,7 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
 @media (min-width: 720px) and (min-height: 720px) {
   body { font-size: 18px; }
   .bar h1, .card h2 { font-size: 23px; }
-  .credits, .hint, .item-sub, .translate-head, .tr-box #trHint, .backup-row .muted, .recent > .muted,
+  .credits, .hint, .item-sub, .translate-head, .tr-box #trHint, .backup-row .muted,
   button.small, .filters button, .quiz-tip { font-size: 16px; }
   .status { font-size: 18px; }
   .field input[type=text] { font-size: 20px; }
@@ -316,11 +325,14 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
 .hand-card { display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(560px, 100%); }
 .hand-head { display: flex; align-items: center; width: 100%; }
 .hand-head h2 { margin: 0; }
+/* Sized by layoutHandPad() in app.js: 1 to 4 squares in a row. */
 .hand-wrap {
-  position: relative; width: min(78vw, 46vh, 420px); aspect-ratio: 1; flex: none;
+  position: relative; width: min(78vw, 46vh, 420px); height: min(78vw, 46vh, 420px); flex: none;
   background: #fff; border: 1px solid var(--line); border-radius: 8px; touch-action: none;
 }
 #hCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.hand-cells { align-items: center; margin: 0; }
+.hand-cells button { min-width: 44px; }
 .hand-side { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
 .hand-side .status { margin: 0; }
 .hand-cands { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 60px; }
@@ -352,7 +364,6 @@ svg.pcell.model { outline-color: var(--brand); outline-width: 3px; }
   .q-big { font-size: 72px; }
   .hand-card { display: grid; grid-template-columns: auto 1fr; column-gap: 20px; align-items: start; width: min(900px, 100%); }
   .hand-head { grid-column: 1 / -1; }
-  .hand-wrap { width: min(80vh - 60px, 45vw, 420px); }
   .hand-side { align-items: flex-start; }
   .hand-cands, .hand-buttons { justify-content: flex-start; }
   .hand-box { text-align: left; }

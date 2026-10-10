@@ -13,7 +13,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 
-/** Bottom sheet listing the Chinese characters of a page; the chosen ones are sent to writing practice. */
+/** Bottom sheet listing the characters to practise on a page; the chosen ones are sent to writing practice. */
 object PracticePicker {
 
     fun show(

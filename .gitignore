@@ -8,3 +8,4 @@ local.properties
 # Local test book folder (sample chapters/files pushed to the emulator or tablet)
 /test/
 tools/.cache/
+__pycache__/

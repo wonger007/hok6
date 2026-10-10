@@ -11,8 +11,8 @@ android {
         applicationId = "com.wonger.hok6"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.14"
+        versionCode = 17
+        versionName = "1.15"
 
     }
 
@@ -94,7 +94,10 @@ dependencies {
     implementation("androidx.input:input-motionprediction:1.0.0")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
     implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("net.sf.kxml:kxml2:2.3.0")

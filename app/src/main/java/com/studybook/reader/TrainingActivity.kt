@@ -12,6 +12,7 @@ import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.speech.tts.TextToSpeech
 import android.webkit.JavascriptInterface
+import android.webkit.JsResult
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -25,6 +26,7 @@ import androidx.webkit.WebViewAssetLoader
 import android.content.Intent
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
@@ -57,7 +59,6 @@ class TrainingActivity : AppCompatActivity() {
     private val handwriting = Handwriting()
     /** Languages whose missing voice or handwriting has been offered on this visit, so it's asked only once. */
     private val askedVoice = HashSet<String>()
-    private val askedHand = HashSet<String>()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,7 +77,8 @@ class TrainingActivity : AppCompatActivity() {
 
         val assets = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
-            // Stroke data, one character per request: /hanzi/<hex code point>
+            // Stroke data, one character per request: /hanzi/<hex code point>, or /hanzi/ja/<hex> (Japanese) and
+            // /hanzi/ko/<hex> (Korean hanja)
             .addPathHandler("/hanzi/") { path -> strokeData(path) }
             .build()
         web.settings.javaScriptEnabled = true
@@ -84,7 +86,27 @@ class TrainingActivity : AppCompatActivity() {
         web.settings.allowFileAccess = false
         // Text follows Android's font size setting, like the rest of Hok6 (a web page ignores it otherwise).
         web.settings.textZoom = (resources.configuration.fontScale * 100).roundToInt()
-        web.webChromeClient = WebChromeClient()
+        // The page's confirm() and alert() as Hok6's own dialogs (the WebView's name the page's web address).
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onJsConfirm(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
+                MaterialAlertDialogBuilder(this@TrainingActivity)
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
+                    .setNegativeButton(android.R.string.cancel) { _, _ -> result.cancel() }
+                    .setOnCancelListener { result.cancel() }
+                    .show()
+                return true
+            }
+
+            override fun onJsAlert(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
+                MaterialAlertDialogBuilder(this@TrainingActivity)
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
+                    .setOnCancelListener { result.confirm() }
+                    .show()
+                return true
+            }
+        }
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) = splash.done()
 
@@ -104,9 +126,16 @@ class TrainingActivity : AppCompatActivity() {
     }
 
     private val hanzi by lazy { HanziBundle.open(this) }
+    private val kanji by lazy { HanziBundle.open(this, HanziBundle.JAPANESE) }
+    private val hanja by lazy { HanziBundle.open(this, HanziBundle.KOREAN) }
 
     private fun strokeData(path: String): WebResourceResponse {
-        val json = path.toIntOrNull(16)?.let { hanzi.json(it) }
+        val bundle = when (path.substringBefore('/', "")) {
+            "ja" -> kanji
+            "ko" -> hanja
+            else -> hanzi
+        }
+        val json = path.substringAfterLast('/').toIntOrNull(16)?.let { bundle.json(it) }
         return if (json != null) {
             WebResourceResponse("application/json", "utf-8", ByteArrayInputStream(json))
         } else {
@@ -146,7 +175,7 @@ class TrainingActivity : AppCompatActivity() {
             Downloads.ask(this, Downloads.Need.VOICE, lang) { Voices.install(this) }
             return
         }
-        val name = getString(if (lang == "yue") R.string.cantonese else R.string.mandarin)
+        val name = Downloads.name(this, lang)
         Toast.makeText(this, getString(R.string.tts_missing, name), Toast.LENGTH_LONG).show()
     }
 
@@ -159,23 +188,8 @@ class TrainingActivity : AppCompatActivity() {
                 is Handwriting.Result.Failed -> JSONObject().put("error", result.message)
             }
             if (isDestroyed) return@recognize
+            // Missing: the page offers ⬇ Download handwriting under the pad (no pop-up).
             web.evaluateJavascript("window.inkResult && inkResult($id, $json)", null)
-            if (result == Handwriting.Result.Missing) {
-                handwritingMissing(lang) { recognizeNow(id, lang, strokes, width, height) }
-            }
-        }
-    }
-
-    /** Offers the handwriting download (once per visit to this screen); recognises [retry] when it's done. */
-    private fun handwritingMissing(lang: String, retry: () -> Unit) {
-        if (!askedHand.add(lang)) return
-        Downloads.ask(this, Downloads.Need.HANDWRITING, lang) {
-            Downloads.downloadHandwriting(lang) { error ->
-                if (isDestroyed) return@downloadHandwriting
-                if (error == null) retry()
-                else Toast.makeText(this, getString(R.string.need_failed), Toast.LENGTH_LONG).show()
-            }
-            retry()
         }
     }
 
@@ -235,6 +249,20 @@ class TrainingActivity : AppCompatActivity() {
             if (ttsReady) speakNow(text, lang, rate) else pendingSpeech = Triple(text, lang, rate)
         }
 
+        /** Stylus or finger (see [Stylus]): whether the screen takes a stylus, and who writes. */
+        @JavascriptInterface
+        fun stylusSupported() = Stylus.supported(this@TrainingActivity)
+
+        @JavascriptInterface
+        fun fingersDraw() = Stylus.fingersDraw(this@TrainingActivity)
+
+        @JavascriptInterface
+        fun setFingersDraw(on: Boolean) = Stylus.setFingersDraw(this@TrainingActivity, on)
+
+        /** A stylus touched the page; true the first time ever (Hok6 then switches to stylus mode). */
+        @JavascriptInterface
+        fun stylusUsed() = Stylus.used(this@TrainingActivity)
+
         @JavascriptInterface
         fun setLanguage(lang: String) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("language", lang).apply()
@@ -251,6 +279,14 @@ class TrainingActivity : AppCompatActivity() {
          * with `inkResult(id, {candidates: [...]} | {downloading: true} | {missing: true} | {error: "..."})`.
          * When the model is missing it offers the download, and answers again once it's done.
          */
+        /** ⬇ Download handwriting on the page: gets [lang]'s recognition, then tells the page (handReady). */
+        @JavascriptInterface
+        fun downloadHandwriting(lang: String) = runOnUiThread {
+            Downloads.downloadHandwriting(lang) { error ->
+                if (!isDestroyed) web.evaluateJavascript("window.handReady && handReady('$lang', ${error == null})", null)
+            }
+        }
+
         @JavascriptInterface
         fun recognizeInk(id: Int, lang: String, strokes: String, width: Float, height: Float) = runOnUiThread {
             recognizeNow(id, lang, strokes, width, height)
@@ -258,6 +294,12 @@ class TrainingActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun settings() = runOnUiThread { startActivity(Intent(this@TrainingActivity, SettingsActivity::class.java)) }
+
+        @JavascriptInterface
+        fun about() = runOnUiThread { startActivity(Intent(this@TrainingActivity, AboutActivity::class.java)) }
+
+        @JavascriptInterface
+        fun version() = Updates.version(this@TrainingActivity)
 
         /** Share PDF: the page sends each worksheet page as shapes and text (see [PageDrawing]), then [shareFinish] opens the share menu. */
         @JavascriptInterface

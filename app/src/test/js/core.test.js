@@ -9,9 +9,9 @@ const zlib = require('zlib');
 const ASSETS = path.join(__dirname, '..', '..', 'main', 'assets');
 const Core = require(path.join(ASSETS, 'training', 'core.js'));
 
-/* Reads hanzi.bin the same way HanziBundle.kt does. */
-function openBundle() {
-  const buf = fs.readFileSync(path.join(ASSETS, 'hanzi.bin'));
+/* Reads a stroke data bundle (hanzi.bin, kanji.bin, hanja.bin) the same way HanziBundle.kt does. */
+function openBundle(name = 'hanzi.bin') {
+  const buf = fs.readFileSync(path.join(ASSETS, name));
   assert.strictEqual(buf.toString('ascii', 0, 4), 'HZB1');
   const count = buf.readUInt32LE(4);
   const index = new Map();
@@ -216,4 +216,86 @@ test('large boxes (the default) match the K1 homework: about 27 mm, whole words 
   }
   assert.strictEqual(Core.wordLayout(['謝', '謝'], [17, 17], true, Core.BOX_SIZES.large).cols, 6);
   assert.strictEqual(Core.wordLayout(['一'], [1], true, Core.BOX_SIZES.large).cols, 7);
+});
+
+// ---------------------------------------------------------------- Japanese and Korean
+
+function topWords(dirName, word, n) {
+  const dir = path.join(ASSETS, 'training', dirName);
+  const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8'));
+  return JSON.parse(fs.readFileSync(path.join(dir, 'i' + word[0] + '.json'), 'utf8'))[word]
+    .slice(0, n).map((i) => JSON.parse(fs.readFileSync(path.join(dir, 'e' + Math.floor(i / meta.chunk) + '.json'), 'utf8'))[i % meta.chunk][0]);
+}
+
+test('Japanese and Korean stroke data: their own bundles, in the same coordinates as the Chinese data', () => {
+  const kanji = openBundle('kanji.bin');
+  assert.ok(kanji.count > 7000);
+  for (const ch of ['必', 'あ', 'ア', 'ん']) {
+    const d = kanji.get(ch);
+    assert.ok(d && d.strokes.length === d.medians.length, ch);
+  }
+  assert.strictEqual(kanji.get('あ').strokes.length, 3);
+  assert.ok(openBundle('hanja.bin').get('學'));
+  // Same box as hanzi-writer-data: x 0-1024, y -124-900.
+  const [x0, x1] = Core.xBounds(kanji.get('日').strokes);
+  const [c0, c1] = Core.xBounds(bundle.get('日').strokes);
+  assert.ok(Math.abs(x0 - c0) < 40 && Math.abs(x1 - c1) < 40);
+});
+
+test('languages: which characters each practises, and the language of some text', () => {
+  assert.deepStrictEqual(Core.practiceWords('食べる ありがとう, hello 学校', 'ja'), ['食べる', 'ありがとう', '学校']);
+  assert.deepStrictEqual(Core.practiceWords('안녕하세요 學校 thanks', 'ko'), ['안녕하세요', '學校']);
+  assert.deepStrictEqual(Core.practiceWords('你好 ありがとう 안녕', 'yue'), ['你好']);
+  assert.strictEqual(Core.scriptLang('学校'), null);
+  assert.strictEqual(Core.scriptLang('がっこう'), 'ja');
+  assert.strictEqual(Core.scriptLang('학교'), 'ko');
+  assert.deepStrictEqual(Core.englishPhrases('thank you ありがとう good night'), ['thank you', 'good night']);
+});
+
+test('readings: Jyutping | Pinyin | Japanese | Korean, and worked out for kana and hangul', () => {
+  assert.deepStrictEqual(Core.readingsIn(readings('学'), 'ja'), ['ガク', 'まな(ぶ)']);
+  assert.deepStrictEqual(Core.readingsIn(readings('學'), 'ko'), ['학']);
+  assert.deepStrictEqual(Core.readingsIn(readings('學'), 'yue'), ['hok6']);
+  assert.deepStrictEqual(Core.charReadings('が', undefined, 'ja'), ['ga']);
+  assert.deepStrictEqual(Core.charReadings('학', undefined, 'ko'), ['hak']);
+  assert.strictEqual(Core.toneLabel('ga', 'ja'), '');
+});
+
+test('kana to rōmaji (Hepburn)', () => {
+  assert.strictEqual(Core.kanaToRomaji('がっこう'), 'gakkou');
+  assert.strictEqual(Core.kanaToRomaji('キャンプ'), 'kyanpu');
+  assert.strictEqual(Core.kanaToRomaji('ラーメン'), 'raamen');
+  assert.strictEqual(Core.kanaToRomaji('ちょっと'), 'chotto');
+  assert.strictEqual(Core.kanaToRomaji('しゃしん'), 'shashin');
+  assert.strictEqual(Core.kanaToRomaji('ファン'), 'fan');
+});
+
+test('hangul: letters, romanization and strokes built from the letters', () => {
+  assert.deepStrictEqual(Core.hangulParts('한'), [18, 0, 4]);
+  assert.strictEqual(Core.romanizeHangul('학교'), 'hakgyo');
+  assert.strictEqual(Core.romanizeHangul('안녕하세요'), 'annyeonghaseyo');
+  // Stroke counts: ㅎ 3 + ㅏ 2 + ㄴ 1; ㄱ 1 + ㅘ (ㅗ 2 + ㅏ 2); ㄷ 2 + ㅏ 2 + ㄺ (ㄹ 3 + ㄱ 1); ㅇ on its own.
+  assert.strictEqual(Core.hangulData('한').strokes.length, 6);
+  assert.strictEqual(Core.hangulData('과').strokes.length, 5);
+  assert.strictEqual(Core.hangulData('닭').strokes.length, 8);
+  assert.strictEqual(Core.hangulData('ㅇ').strokes.length, 1);
+  assert.strictEqual(Core.hangulData('A'), null);
+  const d = Core.hangulData('한');
+  assert.strictEqual(d.strokes.length, d.medians.length);
+  for (const m of d.medians) {
+    for (const [x, y] of m) assert.ok(x >= 0 && x <= 1024 && y >= -124 && y <= 900, `${x},${y} outside the box`);
+  }
+});
+
+test('Japanese and Korean dictionaries find everyday words for common English', () => {
+  assert.ok(topWords('dict-ja', 'school', 2).includes('学校'));
+  assert.ok(topWords('dict-ja', 'water', 2).includes('水'));
+  assert.ok(topWords('dict-ja', 'apple', 2).includes('りんご'));
+  assert.ok(topWords('dict-ko', 'school', 2).includes('학교'));
+  assert.ok(topWords('dict-ko', 'water', 2).includes('물'));
+  assert.ok(topWords('dict-ko', 'tree', 2).includes('나무'));
+  assert.deepStrictEqual(Core.favourites('thank you', 'ja').map((e) => e[0]), ['ありがとう', 'ありがとうございます']);
+  assert.deepStrictEqual(Core.favourites('hello', 'ko').map((e) => e[0]), ['안녕하세요']);
+  assert.strictEqual(Core.entryWord(['謝謝', '谢谢'], 'cmn'), '谢谢');
+  assert.strictEqual(Core.entryWord(['学校', 'がっこう'], 'ja'), '学校');
 });

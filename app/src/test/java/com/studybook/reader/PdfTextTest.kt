@@ -41,12 +41,12 @@ class PdfTextTest {
 
     @Test
     fun pageCharactersAreChineseOnlyInReadingOrderWithoutRepeats() {
-        assertEquals(listOf("第", "一", "課"), PdfText.chineseCharacters(line))
+        assertEquals(listOf("第", "一", "課"), PdfText.practiceCharacters(line))
     }
 
     @Test
     fun multiCharacterGlyphTextIsSplit() {
         val glyphs = listOf(PdfGlyph("你好", 0f, 0f, 40f, 20f), PdfGlyph("你", 40f, 0f, 60f, 20f))
-        assertEquals(listOf("你", "好"), PdfText.chineseCharacters(glyphs))
+        assertEquals(listOf("你", "好"), PdfText.practiceCharacters(glyphs))
     }
 }

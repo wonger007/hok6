@@ -186,6 +186,7 @@ class MainActivity : AppCompatActivity() {
             R.id.back_up -> backup.backUp()
             R.id.restore -> backup.restore()
             R.id.settings -> startActivity(Intent(this, SettingsActivity::class.java))
+            R.id.about -> startActivity(Intent(this, AboutActivity::class.java))
             else -> return super.onOptionsItemSelected(item)
         }
         return true

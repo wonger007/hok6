@@ -1,4 +1,6 @@
-# Test Hok6
+# Test Hok6: Trace, Write and Learn
+
+*Where you learn, study, and imitate.*
 
 1. **Join the testers group** (anyone can join): **[groups.google.com/g/hok6-testers](https://groups.google.com/g/hok6-testers)**
 2. **Become a tester:** **[play.google.com/apps/testing/com.wonger.hok6](https://play.google.com/apps/testing/com.wonger.hok6)**
@@ -9,9 +11,9 @@ The steps are explained below.
 
 ---
 
-**Hok6** (學, *hok6*) is an Android app that turns your own textbook and worksheets (PDF or Word) into pages you can
-write and trace on with a finger or stylus, in any language, and plays the lesson audio. For Chinese (Cantonese or
-Mandarin) it adds stroke-order practice, worksheets and quizzes. It's in testing on Google Play, and you can help by
+**Hok6** is an Android app that turns your own textbook and worksheets (PDF or Word) into pages you can
+write and trace on with a finger or stylus, in any language, and plays the lesson audio. For Cantonese, Mandarin,
+Japanese and Korean it adds stroke-order practice, worksheets and quizzes. It's in testing on Google Play, and you can help by
 trying it.
 
 You need an Android phone or tablet (Android 8.0 or newer) and a Google account.

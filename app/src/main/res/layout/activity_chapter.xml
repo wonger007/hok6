@@ -53,6 +53,12 @@
                         android:contentDescription="@string/practise_mode"
                         android:text="@string/practice_selector" />
 
+                    <!-- Who writes: the stylus only (fingers scroll) or fingers too. Only on devices that take a stylus. -->
+                    <TextView
+                        android:id="@+id/ink_mode"
+                        style="@style/BarTextButton"
+                        android:visibility="gone" />
+
                     <!-- The pen, in its colour; tapping it opens the colours. -->
                     <ImageButton
                         android:id="@+id/ink_pen"
