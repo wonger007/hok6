@@ -160,6 +160,12 @@ For Google Play, `./gradlew bundleRelease` builds `app/build/outputs/bundle/rele
 the upload key named in `~/.gradle/gradle.properties` (`hok6.upload.*`). Without that key, release builds are signed
 with the debug key.
 
+`tools/play_upload.py` uploads that bundle to Google Play with the Play Developer API (`check` lists the tracks,
+`upload AAB --track alpha --name 1.15 --notes notes.txt` releases it on closed testing, `release CODE --track …`
+puts a version already uploaded on another track). It needs a Google Cloud service account that's invited in Play
+Console with release permissions for Hok6; its JSON key stays outside the repo, in
+`~/.config/hok6/play-service-account.json`. See the top of the script for setting it up.
+
 `test/` is a local sample book folder used for testing; it is excluded from git.
 
 ### Character data
