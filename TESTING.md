@@ -1,5 +1,14 @@
 # Test Hok6
 
+1. **Join the testers group** (anyone can join): **[groups.google.com/g/hok6-testers](https://groups.google.com/g/hok6-testers)**
+2. **Become a tester:** **[play.google.com/apps/testing/com.wonger.hok6](https://play.google.com/apps/testing/com.wonger.hok6)**
+3. **Install:** **[Hok6 on Google Play](https://play.google.com/store/apps/details?id=com.wonger.hok6)**
+
+Use the same Google account as the Play Store on your device, and please keep Hok6 installed for two weeks.
+The steps are explained below.
+
+---
+
 **Hok6** (學, *hok6*) is an Android app for studying your own Cantonese or Mandarin textbook: write on your homework,
 practise characters with stroke order, and quiz yourself. It's in testing on Google Play, and you can help by trying it.
 
