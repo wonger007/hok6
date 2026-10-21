@@ -2,6 +2,7 @@ package com.studybook.reader
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -34,7 +35,9 @@ import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 /** Where the last page read of a PDF is kept. */
 fun pageKey(uri: Uri) = "page:$uri"
@@ -59,9 +62,21 @@ class ChapterActivity : AppCompatActivity() {
     private lateinit var docId: String
     private lateinit var listPane: View
     private lateinit var contentPane: View
-    /** Back from an open file closes it and returns to the file list. */
+    private lateinit var inkSidebar: View
+    private lateinit var translateButton: ImageButton
+    private lateinit var translationPanel: View
+    private lateinit var translationText: TextView
+    private var isTranslating = false
+    private var translatingJob: Job? = null
+    /** Back from an open file closes it and returns to the file list (or closes translation panel first). */
     private val closeFileOnBack = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = closeFile()
+        override fun handleOnBackPressed() {
+            if (isTranslating) {
+                toggleTranslation(false)
+                return
+            }
+            closeFile()
+        }
     }
     private lateinit var filesEmpty: View
     private lateinit var placeholder: View
@@ -115,6 +130,12 @@ class ChapterActivity : AppCompatActivity() {
         docxScroll = findViewById(R.id.docx_scroll)
         docxText = findViewById(R.id.docx_text)
         fileTools = findViewById(R.id.file_tools)
+        inkSidebar = findViewById(R.id.ink_sidebar)
+        translateButton = findViewById(R.id.translate_toggle)
+        translationPanel = findViewById(R.id.translation_panel)
+        translationText = findViewById(R.id.translation_text)
+        findViewById<View>(R.id.translation_close).setOnClickListener { toggleTranslation(false) }
+        translateButton.setOnClickListener { toggleTranslation(!isTranslating) }
         practiseButton = findViewById(R.id.practise_mode)
         practiseLangButton = findViewById(R.id.practise_lang)
         modeButton = findViewById(R.id.ink_mode)
@@ -137,6 +158,9 @@ class ChapterActivity : AppCompatActivity() {
         pageIndicator = findViewById(R.id.page_indicator)
         pdf = PdfViewer(findViewById(R.id.pdf_frame), findViewById(R.id.pdf_pages), pageIndicator as TextView, ink)
         pageIndicator.setOnClickListener { askPage() }
+        pdf.onPageChanged = { page ->
+            if (isTranslating) updateTranslation(page)
+        }
         audio = AudioBar(this) { adapter.playing = it }
         practice = PractiseFlow(this, pdf, docxText, { current?.name?.substringBeforeLast('.') ?: chapterName },
             ::updatePractiseLanguage)
@@ -183,6 +207,8 @@ class ChapterActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        translatingJob?.cancel()
+        DocTranslator.close()
         pdf.shutdown()
         audio.release()
         super.onDestroy()
@@ -257,6 +283,8 @@ class ChapterActivity : AppCompatActivity() {
         adapter.selected = null
         for (v in listOf(placeholder, pdfFrame, docxFrame)) v.isVisible = v === placeholder
         fileTools.isVisible = false
+        inkSidebar.isVisible = false
+        toggleTranslation(false)
         invalidateOptionsMenu()
     }
 
@@ -508,6 +536,8 @@ class ChapterActivity : AppCompatActivity() {
         adapter.selected = entry.uri
         for (v in listOf(placeholder, pdfFrame, docxFrame)) v.isVisible = v === view
         fileTools.isVisible = view !== placeholder
+        inkSidebar.isVisible = view !== placeholder
+        if (view === placeholder) toggleTranslation(false)
         showList(false)
         if (!writeHintShown) {
             writeHintShown = true
@@ -520,6 +550,7 @@ class ChapterActivity : AppCompatActivity() {
         select(entry, pdfFrame)
         practice.openPdf(entry.uri)
         pdf.open(entry.uri, prefs.getInt(pageKey(entry.uri), 0)) { showError(it) }
+        if (isTranslating) updateTranslation()
     }
 
     private fun showDocx(entry: Entry) {
@@ -531,6 +562,7 @@ class ChapterActivity : AppCompatActivity() {
                 docxText.text = it
                 docxScroll.scrollTo(0, 0)
                 docxFrame.scrollTo(0, 0)
+                if (isTranslating) updateTranslation()
             }.onFailure { showError(it) }
         }
     }
@@ -542,6 +574,8 @@ class ChapterActivity : AppCompatActivity() {
         adapter.selected = null
         for (v in listOf(placeholder, pdfFrame, docxFrame)) v.isVisible = v === placeholder
         fileTools.isVisible = false
+        inkSidebar.isVisible = false
+        toggleTranslation(false)
         showList(true)
         invalidateOptionsMenu()
     }
@@ -760,7 +794,10 @@ class ChapterActivity : AppCompatActivity() {
                 setMargins(m, m, m, m)
             })
         }
-        popup.showAsDropDown(penButton, 0, (6 * dp).toInt())
+        tray.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val xOff = -(tray.measuredWidth + (8 * dp).toInt())
+        val yOff = -penButton.height
+        popup.showAsDropDown(penButton, xOff, yOff)
     }
 
     /** The pen thicknesses, opening under the thickness button like the colours; choosing one goes back to writing. */
@@ -794,7 +831,77 @@ class ChapterActivity : AppCompatActivity() {
                 setMargins(m, m, m, m)
             })
         }
-        popup.showAsDropDown(sizeButton, 0, (6 * dp).toInt())
+        tray.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val xOff = -(tray.measuredWidth + (8 * dp).toInt())
+        val yOff = -sizeButton.height
+        popup.showAsDropDown(sizeButton, xOff, yOff)
+    }
+
+    private fun toggleTranslation(enable: Boolean) {
+        isTranslating = enable
+        translateButton.setBackgroundResource(if (isTranslating) R.drawable.bar_selected else R.drawable.bar_button)
+        translationPanel.isVisible = isTranslating
+        if (isTranslating) {
+            updateTranslation()
+        } else {
+            translatingJob?.cancel()
+            translatingJob = null
+        }
+    }
+
+    private fun updateTranslation(pdfPage: Int? = null) {
+        translatingJob?.cancel()
+        val currentFile = current ?: return
+        val isPdf = pdfFrame.isVisible
+        val isDocx = docxFrame.isVisible
+        if (!isPdf && !isDocx) {
+            translationText.text = getString(R.string.no_text_to_translate)
+            return
+        }
+        translationText.text = getString(R.string.translating)
+        translatingJob = lifecycleScope.launch {
+            val rawText = withContext(Dispatchers.IO) {
+                if (isPdf) {
+                    val p = pdfPage ?: pdf.currentPage
+                    val t = PdfText.pageText(this@ChapterActivity, currentFile.uri, p)
+                    if (t.isNotBlank()) t else {
+                        val widthPoints = pdf.pageWidthPoints(p) ?: 600
+                        val pixels = 1600
+                        val bitmap = suspendCancellableCoroutine<Bitmap?> { cont ->
+                            pdf.renderPage(p, pixels) { cont.resume(it) }
+                        }
+                        if (bitmap != null) {
+                            try {
+                                val reads = PdfOcr.readAll(bitmap, widthPoints.toFloat() / pixels)
+                                val script = LanguageChars.pageScript(reads.mapValues { e -> e.value.map { it.text } }) ?: "zh"
+                                reads[script]?.joinToString(" ") { it.text }.orEmpty()
+                            } finally {
+                                bitmap.recycle()
+                            }
+                        } else ""
+                    }
+                } else {
+                    docxText.text.toString()
+                }
+            }
+
+            if (rawText.isBlank()) {
+                translationText.text = getString(R.string.no_text_to_translate)
+                return@launch
+            }
+
+            val prefLang = Downloads.language(this@ChapterActivity)
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    DocTranslator.translateToEnglish(rawText, LanguageChars.script(prefLang))
+                }
+            }
+            result.onSuccess { translated ->
+                translationText.text = translated.ifBlank { getString(R.string.no_text_to_translate) }
+            }.onFailure { err ->
+                translationText.text = getString(R.string.translation_failed, err.localizedMessage ?: err.javaClass.simpleName)
+            }
+        }
     }
 
     /** A white line [thickness] px thick and [length] px long, with round ends: how thick the pen writes. */

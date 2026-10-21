@@ -234,4 +234,10 @@
     <string name="quiz_button">Add to quiz (%1$d)</string>
     <string name="quiz_added">Added %1$d to the quiz (%2$d in it now). Open Practice &amp; Quiz → Quiz.</string>
     <string name="quiz_already">Already in the quiz</string>
+    <string name="translate_to_english">Translate to English</string>
+    <string name="translating">Translating to English…</string>
+    <string name="translation_title">English Translation</string>
+    <string name="no_text_to_translate">No text found to translate on this page</string>
+    <string name="translation_failed">Translation unavailable: %1$s</string>
+    <string name="close">Close</string>
 </resources>

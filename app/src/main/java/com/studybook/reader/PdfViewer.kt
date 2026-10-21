@@ -55,6 +55,9 @@ class PdfViewer(
     /** Tap on a page in practise mode: page index and the point in PDF points from the page's top-left corner. */
     var onPageTap: ((page: Int, x: Float, y: Float) -> Unit)? = null
 
+    /** Called when the page in the middle of the screen changes. */
+    var onPageChanged: ((page: Int) -> Unit)? = null
+
     val currentPage: Int get() = layoutManager.findFirstVisibleItemPosition().coerceAtLeast(0)
 
     /** The page in the middle of the screen. */
@@ -218,11 +221,13 @@ class PdfViewer(
     }
 
     private fun updateIndicator() {
+        val prev = shownPage
         shownPage = middlePage
         val count = pageSizes.size
         indicator.isVisible = count > 0
         if (count == 0) return
         indicator.text = "${middlePage + 1} / $count"
+        if (shownPage != prev && shownPage >= 0) onPageChanged?.invoke(shownPage)
     }
 
     private fun render(holder: PageHolder, page: Int, width: Int, gen: Int) {

@@ -748,6 +748,8 @@ function setupInk(pages) {
   let active = null;
   let tap = null;
   let pan = null;
+  let pinchDist = 0;
+  let pinchZoom = 1;
   let blockTouch = false;
   const pens = new Set();
 
@@ -755,6 +757,12 @@ function setupInk(pages) {
     let x = 0, y = 0;
     for (const t of touches.values()) { x += t.x; y += t.y; }
     return { x: x / touches.size, y: y / touches.size };
+  };
+
+  const getPinchDist = () => {
+    const pts = [...touches.values()];
+    if (pts.length < 2) return 0;
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   };
 
   const cancelActive = () => {
@@ -769,10 +777,28 @@ function setupInk(pages) {
   pages.addEventListener('touchstart', stopPenScroll, { passive: false });
   pages.addEventListener('touchmove', stopPenScroll, { passive: false });
 
+  // Touchpad pinch or ctrl+wheel zoom
+  pages.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.08 : 0.92;
+      setZoom(state.zoom * factor);
+    }
+  }, { passive: false });
+
   pages.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'pen') pens.add(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size >= 2) {
+        cancelActive();
+        pinchDist = getPinchDist();
+        pinchZoom = state.zoom;
+        pan = avg();
+        blockTouch = true;
+        e.preventDefault();
+        return;
+      }
       if (!state.fingerDraw) {
         // Only the stylus writes, but a finger tap still opens a stroke-order square or says the word; a drag scrolls.
         const tapSvg = touches.size === 1 && e.target.closest && e.target.closest('svg[data-page]');
@@ -784,12 +810,6 @@ function setupInk(pages) {
           state.fingerHinted = true;
           toast('✍ Stylus: only the stylus writes; fingers scroll.', { label: '☝ Finger', run: () => setFingerDraw(true, true) });
         }
-        return;
-      }
-      if (touches.size >= 2) {
-        cancelActive();
-        pan = avg();
-        blockTouch = true;
         return;
       }
       if (blockTouch) return;
@@ -822,10 +842,16 @@ function setupInk(pages) {
   pages.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pan && touches.size >= 2) {
-        const now = avg();
-        pages.scrollBy(pan.x - now.x, pan.y - now.y);
-        pan = now;
+      if (touches.size >= 2) {
+        const d = getPinchDist();
+        if (pinchDist > 0 && d > 0) {
+          setZoom(pinchZoom * (d / pinchDist));
+        }
+        if (pan) {
+          const now = avg();
+          pages.scrollBy(pan.x - now.x, pan.y - now.y);
+          pan = now;
+        }
         return;
       }
     }
@@ -847,10 +873,14 @@ function setupInk(pages) {
     pens.delete(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
-      if (touches.size < 2) pan = touches.size ? avg() : null;
+      if (touches.size < 2) {
+        pinchDist = 0;
+        pan = touches.size ? avg() : null;
+      }
       if (touches.size === 0) {
         blockTouch = false;
         pan = null;
+        pinchDist = 0;
       }
     }
     if (tap && tap.id === e.pointerId) {
@@ -2568,11 +2598,23 @@ async function openSheet(ws) {
   $('sheetTitle').textContent = ws.title;
   $('pages').scrollTop = 0;
   recordPractised((ws.words && ws.words.length ? ws.words : ws.chars).filter(Boolean));
+  document.body.classList.toggle('blank-worksheet', Boolean(ws.blank));
+  if (ws.blank) {
+    $('viewBtn').hidden = true;
+    setView('page');
+    setZoom(store.get('blankZoom', IS_PHONE ? 1.75 : 1.45));
+  } else {
+    $('viewBtn').hidden = !IS_PHONE;
+    if (IS_PHONE) setView(store.get('phoneView', 'row'));
+    setZoom(store.get('zoom', 1));
+  }
   await renderPages();
 }
 
 function closeSheet() {
   saveInk();
+  document.body.classList.remove('blank-worksheet');
+  $('viewBtn').hidden = !IS_PHONE;
   $('moreMenu').hidden = true;
   state.ws = null;
   $('pages').innerHTML = '';
@@ -2582,8 +2624,12 @@ function closeSheet() {
 }
 
 function setZoom(z) {
-  state.zoom = Math.max(0.6, Math.min(2.5, z));
-  store.set('zoom', state.zoom);
+  state.zoom = Math.max(0.6, Math.min(3.0, z));
+  if (state.ws && state.ws.blank) {
+    store.set('blankZoom', state.zoom);
+  } else {
+    store.set('zoom', state.zoom);
+  }
   $('pages').style.setProperty('--zoom', state.zoom);
 }
 
@@ -2678,6 +2724,13 @@ function setupSheet() {
   };
   $('zoomIn').onclick = () => setZoom(state.zoom * 1.25);
   $('zoomOut').onclick = () => setZoom(state.zoom / 1.25);
+  if ($('zoomFit')) {
+    $('zoomFit').onclick = () => {
+      const fit = state.ws && state.ws.blank ? (IS_PHONE ? 1.75 : 1.45) : 1.0;
+      setZoom(fit);
+      toast('Fitted to screen');
+    };
+  }
   setFingerDraw(state.fingerDraw, false);
   setZoom(state.zoom);
   updateTools();

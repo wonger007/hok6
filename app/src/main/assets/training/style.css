@@ -172,8 +172,24 @@ svg.page {
   width: calc(min(100%, 1100px) * var(--zoom));
   height: auto;
   margin: 0 auto 20px;
+  margin-left: max(0px, calc((100% - min(100%, 1100px) * var(--zoom)) / 2));
+  margin-right: max(0px, calc((100% - min(100%, 1100px) * var(--zoom)) / 2));
   background: #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+/* Blank worksheet: zoom, fit to screen, and hide character-specific hints and audio controls */
+body.blank-worksheet #hint,
+body.blank-worksheet #strokeNote {
+  display: none !important;
+}
+body.blank-worksheet #wordSay,
+body.blank-worksheet #wordSlow,
+body.blank-worksheet #wordStar {
+  display: none !important;
+}
+body.blank-worksheet #pages {
+  padding: 8px;
+  overscroll-behavior: contain;
 }
 /* Worksheets are laid out to the page, so Android's font size setting mustn't resize their text. */
 svg.page, svg.pcell { -webkit-text-size-adjust: none; text-size-adjust: none; }

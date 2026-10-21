@@ -29,6 +29,27 @@ object PdfText {
         }
     }
 
+    /** Extracts text from a specific page (0-based) for translation. Call off the main thread. */
+    fun pageText(context: Context, uri: Uri, page: Int): String {
+        if (!initialised) {
+            PDFBoxResourceLoader.init(context.applicationContext)
+            initialised = true
+        }
+        val input = context.contentResolver.openInputStream(uri) ?: return ""
+        return runCatching {
+            input.use { stream ->
+                PDDocument.load(stream).use { doc ->
+                    if (page + 1 !in 1..doc.numberOfPages) return@use ""
+                    val stripper = PDFTextStripper()
+                    stripper.sortByPosition = true
+                    stripper.startPage = page + 1
+                    stripper.endPage = page + 1
+                    stripper.getText(doc).trim()
+                }
+            }
+        }.getOrDefault("")
+    }
+
     private fun glyphs(doc: PDDocument, page: Int): List<PdfGlyph> {
         val out = ArrayList<PdfGlyph>()
         val stripper = object : PDFTextStripper() {
