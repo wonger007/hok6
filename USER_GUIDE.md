@@ -77,7 +77,8 @@ and pick the SD card.
   your choice, on homework pages and in Practice & Quiz alike. Devices without a stylus have no toggle: fingers
   always write.
 - Use the title bar to change the pen colour (tap the pen to open the colours) and thickness (tap the line next to it:
-  the line shows how thick the pen is), erase, or zoom (− / +, or pinch).
+  the line shows how thick the pen is), erase, or zoom (− / +, or pinch). After erasing, one tap on the pen goes back to
+  writing with the same colour.
 - **Clear** erases the tracing on one page. It asks first, and asks which page when two pages with tracing are on
   screen. The message that appears afterwards offers **Undo**.
 - Tap the page number at the bottom (e.g. **2 / 5**) to go to another page. Hok6 remembers the page you were on.
@@ -111,7 +112,8 @@ and pinyin/jyutping above characters. Zooming doesn't re-wrap the lines, so trac
   being written; **Radical** shows the character's radical, the part dictionaries sort it under, in green); tap 🔊 to hear the word,
   and the speed button next to it for 1×, 0.75× or 0.5×. Tone names are shown with the reading (e.g. nei5 · tone 5,
   low rising).
-- The worksheet's title bar works like a homework page's: tap the pen for the colours, the line for the thickness,
+- The worksheet's title bar works like a homework page's: tap the pen for the colours (after erasing, one tap goes back
+  to the pen), the line for the thickness,
   and **Clear** (with Undo in the message). **Export** prints it or shares it as a PDF (US Letter), blank or with your writing. It has the same
   **✍ Stylus / ☝ Finger** toggle (under **⋮** on phones), and a finger tap on a stroke-order square still opens it in
   stylus mode. **⋮** holds **Zoom in / out** (the menu stays open while you zoom; tap

@@ -636,7 +636,16 @@ class ChapterActivity : AppCompatActivity() {
             menu.show()
         }
         updatePractiseLanguage()
-        penButton.setOnClickListener { showColours() }
+        penButton.setOnClickListener {
+            // From the eraser, one tap goes back to the pen; the colours are for when the pen is already in hand.
+            if (ink.tool == InkTool.ERASER) {
+                ink.tool = InkTool.PEN
+                leavePractice()
+                updateInkTools()
+            } else {
+                showColours()
+            }
+        }
         eraserButton.setOnClickListener {
             ink.tool = if (ink.tool == InkTool.ERASER) InkTool.PEN else InkTool.ERASER
             leavePractice()

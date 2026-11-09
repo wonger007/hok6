@@ -2677,7 +2677,11 @@ function setupSheet() {
   $('sheetBack').onclick = () => {
     if (state.autoStarted && Native && Native.close) { saveInk(); Native.close(); } else closeSheet();
   };
-  $('penBtn').onclick = (e) => { e.stopPropagation(); toggleTray('colorTray', 'penBtn'); };
+  $('penBtn').onclick = (e) => {
+    e.stopPropagation();
+    // From the eraser, one tap goes back to the pen; the colours are for when the pen is already in hand.
+    if (state.tool === 'eraser') { state.tool = 'pen'; updateTools(); } else toggleTray('colorTray', 'penBtn');
+  };
   $('sizeBtn').onclick = (e) => { e.stopPropagation(); toggleTray('sizeTray', 'sizeBtn'); };
   document.querySelectorAll('#sizeTray button.size').forEach((b) => {
     b.onclick = () => { state.size = Number(b.dataset.size); state.tool = 'pen'; $('sizeTray').hidden = true; updateTools(); };
