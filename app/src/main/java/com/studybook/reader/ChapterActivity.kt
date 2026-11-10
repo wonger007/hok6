@@ -549,8 +549,9 @@ class ChapterActivity : AppCompatActivity() {
     private fun showPdf(entry: Entry) {
         select(entry, pdfFrame)
         practice.openPdf(entry.uri)
+        // An open translation follows once the file is loaded: the viewer reports the page it opens on.
+        if (isTranslating) translationText.text = getString(R.string.translating)
         pdf.open(entry.uri, prefs.getInt(pageKey(entry.uri), 0)) { showError(it) }
-        if (isTranslating) updateTranslation()
     }
 
     private fun showDocx(entry: Entry) {
@@ -858,6 +859,7 @@ class ChapterActivity : AppCompatActivity() {
         }
     }
 
+    /** Translates what is showing: the Word file, or the PDF page in the middle of the screen (or [pdfPage]). */
     private fun updateTranslation(pdfPage: Int? = null) {
         translatingJob?.cancel()
         val currentFile = current ?: return
@@ -868,16 +870,19 @@ class ChapterActivity : AppCompatActivity() {
             return
         }
         translationText.text = getString(R.string.translating)
+        // The views are read here, on the main thread; only the file reading and recognition move off it.
+        val p = pdfPage ?: pdf.middlePage
+        val widthPoints = pdf.pageWidthPoints(p) ?: 600
+        val docxString = if (isDocx) docxText.text.toString() else ""
         translatingJob = lifecycleScope.launch {
             val rawText = withContext(Dispatchers.IO) {
                 if (isPdf) {
-                    val p = pdfPage ?: pdf.currentPage
                     val t = PdfText.pageText(this@ChapterActivity, currentFile.uri, p)
                     if (t.isNotBlank()) t else {
-                        val widthPoints = pdf.pageWidthPoints(p) ?: 600
                         val pixels = 1600
                         val bitmap = suspendCancellableCoroutine<Bitmap?> { cont ->
-                            pdf.renderPage(p, pixels) { cont.resume(it) }
+                            // A page that arrives after the translation was cancelled has no one to recycle it.
+                            pdf.renderPage(p, pixels) { if (cont.isActive) cont.resume(it) else it?.recycle() }
                         }
                         if (bitmap != null) {
                             try {
@@ -890,7 +895,7 @@ class ChapterActivity : AppCompatActivity() {
                         } else ""
                     }
                 } else {
-                    docxText.text.toString()
+                    docxString
                 }
             }
 

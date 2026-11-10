@@ -137,7 +137,8 @@ class PdfViewer(
                     pageSizes = sizes
                     adapter.notifyDataSetChanged()
                     layoutManager.scrollToPositionWithOffset(startPage.coerceIn(0, (sizes.size - 1).coerceAtLeast(0)), 0)
-                    pages.post { updateIndicator() }
+                    // A new file always reports the page it opens on, even when the number is the last file's.
+                    pages.post { shownPage = -1; updateIndicator() }
                 }
             } catch (t: Throwable) {
                 runCatching { pfd?.close() }
