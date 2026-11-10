@@ -277,7 +277,7 @@
                         app:tint="#CCCCCC" />
                 </LinearLayout>
 
-                <ScrollView
+                <com.studybook.reader.MaxHeightScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
@@ -291,7 +291,7 @@
                         android:textColor="#FFFFFF"
                         android:textSize="15sp"
                         android:textIsSelectable="true" />
-                </ScrollView>
+                </com.studybook.reader.MaxHeightScrollView>
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>
