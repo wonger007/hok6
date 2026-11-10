@@ -418,9 +418,10 @@ function fillWordSelect(table) {
   });
 }
 
-function setView(view) {
+/* Shows worksheets a row at a time or as whole pages; a phone remembers the choice unless [remember] is false. */
+function setView(view, remember = true) {
   state.view = view;
-  if (IS_PHONE) store.set('phoneView', view);
+  if (IS_PHONE && remember) store.set('phoneView', view);
   document.body.classList.toggle('row-view', view === 'row');
   $('viewBtn').textContent = view === 'row' ? '📄 Whole pages' : '▦ One row at a time';
   if (view === 'row' && state.ws) renderRow();
@@ -2601,7 +2602,8 @@ async function openSheet(ws) {
   document.body.classList.toggle('blank-worksheet', Boolean(ws.blank));
   if (ws.blank) {
     $('viewBtn').hidden = true;
-    setView('page');
+    // A blank worksheet is always whole pages; the phone's own choice stays for the other worksheets.
+    setView('page', false);
     setZoom(store.get('blankZoom', IS_PHONE ? 1.75 : 1.45));
   } else {
     $('viewBtn').hidden = !IS_PHONE;
