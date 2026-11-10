@@ -18,8 +18,10 @@ object DocTranslator {
     private val translators = ConcurrentHashMap<String, Translator>()
 
     /**
-     * Determines the source language code for translation:
-     * "ja" for Japanese, "ko" for Korean, or "zh" for Chinese.
+     * The language to translate [text] from, by what it is written in: Korean when it has hangul, Japanese when it
+     * has kana, else Chinese. Text in characters alone could be any of them, so it follows [defaultLang] (the script
+     * of the language being learnt: "zh", "ja" or "ko") when that is Japanese; Korean books' characters read as
+     * Chinese. Text with none of these scripts follows [defaultLang] too.
      */
     fun detectSourceLanguage(text: String, defaultLang: String? = null): String {
         var hangulCount = 0
@@ -38,8 +40,8 @@ object DocTranslator {
         return when {
             hangulCount > 0 && hangulCount >= kanaCount -> TranslateLanguage.KOREAN
             kanaCount > 0 -> TranslateLanguage.JAPANESE
-            hanCount > 0 -> TranslateLanguage.CHINESE
             defaultLang == "ja" -> TranslateLanguage.JAPANESE
+            hanCount > 0 -> TranslateLanguage.CHINESE
             defaultLang == "ko" -> TranslateLanguage.KOREAN
             else -> TranslateLanguage.CHINESE
         }
@@ -55,11 +57,12 @@ object DocTranslator {
         }
     }
 
-    suspend fun translateToEnglish(text: String, sourceLang: String? = null): String {
+    /** [text] in English, translated from the language it is written in ([detectSourceLanguage]). */
+    suspend fun translateToEnglish(text: String, defaultLang: String? = null): String {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return ""
 
-        val lang = sourceLang ?: detectSourceLanguage(trimmed)
+        val lang = detectSourceLanguage(trimmed, defaultLang)
         val translator = getTranslator(lang)
         val conditions = DownloadConditions.Builder().build()
 
