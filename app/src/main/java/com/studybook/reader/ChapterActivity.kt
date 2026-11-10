@@ -883,7 +883,7 @@ class ChapterActivity : AppCompatActivity() {
                             try {
                                 val reads = PdfOcr.readAll(bitmap, widthPoints.toFloat() / pixels)
                                 val script = LanguageChars.pageScript(reads.mapValues { e -> e.value.map { it.text } }) ?: "zh"
-                                reads[script]?.joinToString(" ") { it.text }.orEmpty()
+                                DocTranslator.glyphText(reads[script].orEmpty(), script)
                             } finally {
                                 bitmap.recycle()
                             }

@@ -47,6 +47,32 @@ object DocTranslator {
         }
     }
 
+    /**
+     * The text of a scanned page from the characters read on it ([PdfOcr.readAll], in reading order), put back
+     * together for translating: characters join up, with a space only where the page has a gap between them (words
+     * in Korean or English). A new line joins up too, as a sentence runs on across it, except in Korean ([script]
+     * "ko"), where a line ends on a word.
+     */
+    fun glyphText(glyphs: List<PdfGlyph>, script: String): String {
+        val out = StringBuilder()
+        var prev: PdfGlyph? = null
+        for (g in glyphs) {
+            val p = prev
+            if (p != null) {
+                val middle = (g.top + g.bottom) / 2
+                val sameLine = middle > p.top && middle < p.bottom && g.left >= p.left
+                val gap = if (sameLine) g.left - p.right > WORD_GAP * (p.bottom - p.top) else script == "ko"
+                if (gap) out.append(' ')
+            }
+            out.append(g.text)
+            prev = g
+        }
+        return out.toString()
+    }
+
+    /** A gap between two characters wider than this share of their height is a space. */
+    private const val WORD_GAP = 0.3f
+
     private fun getTranslator(sourceLanguage: String): Translator {
         return translators.getOrPut(sourceLanguage) {
             val options = TranslatorOptions.Builder()
