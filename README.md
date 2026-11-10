@@ -83,6 +83,8 @@ The [**User Guide**](USER_GUIDE.md) shows how to use all of this step by step.
 - **Tracing** on PDF and Word pages with finger or stylus, saved per page; on stylus devices a **✍ Stylus / ☝ Finger**
   toggle says whether fingers write too. **Clear** asks first and offers Undo, and ⋮ → **Save a copy with my
   tracing…** writes a new PDF with the tracing drawn in.
+- **Translate to English:** a panel with the page's text in English, translated on the device (each language's
+  model downloads once).
 - **Practice Selector:** tap a character on a page to practice it or add it to the quiz; scanned pages are read with
   on-device text recognition.
 - **Practice & Quiz** for Cantonese (Jyutping), Mandarin (Pinyin), Japanese (kana and rōmaji) and Korean (Revised
@@ -229,6 +231,7 @@ This project builds on, bundles data from, or was modelled on the following proj
 | [garfieldnate/kengdic](https://github.com/garfieldnate/kengdic) | English → Korean dictionary (bundled in `training/dict-ko/`) | MPL 2.0 (or LGPL 2.0+) |
 | [Google ML Kit Text Recognition v2](https://developers.google.com/ml-kit/vision/text-recognition/v2) (Chinese, Japanese, Korean) | Recognising characters on scanned PDF pages that have no text layer (on-device, bundled models) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
 | [Google ML Kit Digital Ink Recognition](https://developers.google.com/ml-kit/vision/digital-ink-recognition) | **✍ Draw** in Practice & Quiz: recognising handwritten characters (on-device; each language's model downloads once) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
+| [Google ML Kit Translation](https://developers.google.com/ml-kit/language/translation) | **Translate to English** on PDF and Word pages (on-device; each language's model downloads once) | [ML Kit Terms](https://developers.google.com/ml-kit/terms) |
 | [Lexical Lists for Chinese Learning in Hong Kong](https://www.edbchinese.hk/lexlist_ch/) (香港小學學習字詞表, Education Bureau) | Reference for Hong Kong stroke order: `training/hk-order.json` lists, for the characters where Hong Kong's order differs from the stroke data's, Hok6's own strokes in Hong Kong's order. No graphics or data of the Bureau's are included. | © HKSAR Government; used as a reference |
 | [Google Play In-App Updates](https://developer.android.com/guide/playcore/in-app-updates) | **Check for updates** on the About page, for Hok6 installed from Google Play | [Play Core Software Development Kit Terms](https://developer.android.com/guide/playcore#license) |
 

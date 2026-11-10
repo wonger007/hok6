@@ -76,9 +76,14 @@ and pick the SD card.
   or a child using a finger). The first time you use a stylus Hok6 switches to **✍ Stylus**; after that it remembers
   your choice, on homework pages and in Practice & Quiz alike. Devices without a stylus have no toggle: fingers
   always write.
-- Use the title bar to change the pen colour (tap the pen to open the colours) and thickness (tap the line next to it:
-  the line shows how thick the pen is), erase, or zoom (− / +, or pinch). After erasing, one tap on the pen goes back to
-  writing with the same colour.
+- The pen, its thickness and the eraser are in a small bar on the right side of the page: tap the pen to open the
+  colours, and the line under it for the thickness (the line shows how thick the pen is). After erasing, one tap on the
+  pen goes back to writing with the same colour. Zoom with − / + in the title bar, or pinch.
+- **Translate to English** (the 文A button in the title bar) opens a panel at the bottom of the page with the page's
+  text in English: the PDF page in the middle of the screen, following as you scroll, or the Word file. Scanned pages
+  are read on the device first. The translation is made on the device, from the language the page is written in. The
+  first time, it downloads that language's translation model from Google, which needs internet; after that it works
+  offline. Tap ✕ or Back to close the panel.
 - **Clear** erases the tracing on one page. It asks first, and asks which page when two pages with tracing are on
   screen. The message that appears afterwards offers **Undo**.
 - Tap the page number at the bottom (e.g. **2 / 5**) to go to another page. Hok6 remembers the page you were on.
@@ -112,12 +117,12 @@ and pinyin/jyutping above characters. Zooming doesn't re-wrap the lines, so trac
   being written; **Radical** shows the character's radical, the part dictionaries sort it under, in green); tap 🔊 to hear the word,
   and the speed button next to it for 1×, 0.75× or 0.5×. Tone names are shown with the reading (e.g. nei5 · tone 5,
   low rising).
-- The worksheet's title bar works like a homework page's: tap the pen for the colours (after erasing, one tap goes back
-  to the pen), the line for the thickness,
+- The worksheet's title bar has the same writing tools as a homework page: tap the pen for the colours (after erasing,
+  one tap goes back to the pen), the line for the thickness,
   and **Clear** (with Undo in the message). **Export** prints it or shares it as a PDF (US Letter), blank or with your writing. It has the same
   **✍ Stylus / ☝ Finger** toggle (under **⋮** on phones), and a finger tap on a stroke-order square still opens it in
-  stylus mode. **⋮** holds **Zoom in / out** (the menu stays open while you zoom; tap
-  outside it to close).
+  stylus mode. **⋮** holds **Zoom in / out** and **Fit to screen**, which sets the zoom back
+  to its starting size (the menu stays open while you zoom; tap outside it to close).
 - Your writing on a worksheet is kept for each word, so it's still there when you practice that word again.
 - **History** lists the words and characters you've practiced in the language you're practising now (with quiz
   results) and your bookmarks, each one tap away from a fresh worksheet. **📝** on a row adds it to the quiz (tap again
