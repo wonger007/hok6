@@ -121,8 +121,8 @@ and pinyin/jyutping above characters. Zooming doesn't re-wrap the lines, so trac
   one tap goes back to the pen), the line for the thickness,
   and **Clear** (with Undo in the message). **Export** prints it or shares it as a PDF (US Letter), blank or with your writing. It has the same
   **✍ Stylus / ☝ Finger** toggle (under **⋮** on phones), and a finger tap on a stroke-order square still opens it in
-  stylus mode. **⋮** holds **Zoom in / out** and **Fit to screen**, which sets the zoom back
-  to its starting size (the menu stays open while you zoom; tap outside it to close).
+  stylus mode. **⋮** holds **Zoom in / out** and **Fit to screen**, which shows the page's
+  whole width (the menu stays open while you zoom; tap outside it to close).
 - Your writing on a worksheet is kept for each word, so it's still there when you practice that word again.
 - **History** lists the words and characters you've practiced in the language you're practising now (with quiz
   results) and your bookmarks, each one tap away from a fresh worksheet. **📝** on a row adds it to the quiz (tap again

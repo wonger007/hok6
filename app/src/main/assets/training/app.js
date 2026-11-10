@@ -2732,8 +2732,10 @@ function setupSheet() {
   $('zoomOut').onclick = () => setZoom(state.zoom / 1.25);
   if ($('zoomFit')) {
     $('zoomFit').onclick = () => {
-      const fit = state.ws && state.ws.blank ? (IS_PHONE ? 1.75 : 1.45) : 1.0;
-      setZoom(fit);
+      // A page is min(100%, 1100px) wide at zoom 1; a blank worksheet fills the width of a wider screen too.
+      const style = getComputedStyle($('pages'));
+      const width = $('pages').clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      setZoom(state.ws && state.ws.blank && width > 1100 ? width / 1100 : 1);
       toast('Fitted to screen');
     };
   }
